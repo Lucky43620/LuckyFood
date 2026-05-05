@@ -12,7 +12,7 @@ const step     = ref(1)
 const STEPS    = ['Infos', 'Ingrédients', 'Résumé']
 const canBack  = computed(() => step.value > 1)
 const canNext  = computed(() => {
-  if (step.value === 1) return form.name.trim().length > 0
+  if (step.value === 1) return String(form.value.name ?? '').trim().length > 0
   if (step.value === 2) return ingredients.value.length > 0
   return true
 })
