@@ -117,6 +117,27 @@ const deleteRecipe = () => {
         </div>
       </div>
 
+      <!-- Instructions -->
+      <div v-if="(recipe.instructions ?? []).length" class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-neutral-100">
+          <p class="text-[11px] font-semibold tracking-widest uppercase text-neutral-400">
+            Préparation
+          </p>
+        </div>
+        <div class="divide-y divide-neutral-50">
+          <div
+            v-for="(instruction, index) in recipe.instructions"
+            :key="index"
+            class="flex gap-3 px-4 py-3"
+          >
+            <span class="w-6 h-6 rounded-full bg-green-50 text-green-600 text-xs font-bold flex items-center justify-center shrink-0">
+              {{ index + 1 }}
+            </span>
+            <p class="text-[13px] leading-6 text-neutral-700">{{ instruction }}</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Total nutritional info -->
       <div class="bg-green-50 rounded-lg px-4 py-3">
         <p class="text-[10px] font-semibold tracking-widest uppercase text-green-700 mb-2">Total recette</p>

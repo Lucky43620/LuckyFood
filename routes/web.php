@@ -35,6 +35,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/recherche/aliment/{foodId}', [FoodSearchController::class, 'show'])->name('search.show');
 
         // ── Recettes ────────────────────────────────────────────────────────────
+        Route::get('/recettes/ingredients/search', [RecipeController::class, 'searchIngredients'])->name('recipes.ingredients.search');
         Route::resource('recettes', RecipeController::class)
             ->names('recipes')
             ->parameters(['recettes' => 'recipe'])

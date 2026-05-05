@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Recipe;
 use App\Models\RecipeIngredient;
+use App\Services\FatSecretService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -11,6 +13,8 @@ use Inertia\Response;
 
 class RecipeController extends Controller
 {
+    public function __construct(private FatSecretService $fatSecret) {}
+
     public function index(Request $request): Response
     {
         $recipes = Recipe::where('user_id', $request->user()->id)
@@ -28,6 +32,42 @@ class RecipeController extends Controller
         return Inertia::render('Recettes/Create');
     }
 
+    public function searchIngredients(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->input('q', ''));
+
+        if (strlen($query) < 2) {
+            return response()->json([
+                'results' => [],
+                'error' => null,
+            ]);
+        }
+
+        $search = $this->fatSecret->searchFoodsPage(
+            $query,
+            0,
+            10,
+            $request->user()?->fatsecret_region,
+            $request->user()?->fatsecret_language,
+        );
+
+        return response()->json([
+            'results' => array_values(array_map(
+                static fn (array $food): array => [
+                    'food_id' => (string) ($food['food_id'] ?? ''),
+                    'food_name' => (string) ($food['food_name'] ?? ''),
+                    'serving_description' => (string) ($food['serving_description'] ?? ''),
+                    'calories' => (float) ($food['calories'] ?? 0),
+                    'protein' => (float) ($food['protein'] ?? 0),
+                    'carbs' => (float) ($food['carbs'] ?? 0),
+                    'fat' => (float) ($food['fat'] ?? 0),
+                ],
+                $search['results'],
+            )),
+            'error' => $this->ingredientSearchError($this->fatSecret->lastError()),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -36,6 +76,8 @@ class RecipeController extends Controller
             'prep_time'      => 'required|integer|min:0',
             'tags'           => 'nullable|array',
             'tags.*'         => 'string|max:100',
+            'instructions'    => 'nullable|array',
+            'instructions.*'  => 'nullable|string|max:2000',
             'total_calories' => 'required|integer|min:0',
             'total_protein'  => 'nullable|numeric|min:0',
             'total_carbs'    => 'nullable|numeric|min:0',
@@ -57,6 +99,7 @@ class RecipeController extends Controller
             'servings'       => $validated['servings'],
             'prep_time'      => $validated['prep_time'],
             'tags'           => $validated['tags'] ?? [],
+            'instructions'    => $this->normalizeInstructions($validated['instructions'] ?? []),
             'total_calories' => $validated['total_calories'],
             'total_protein'  => $validated['total_protein'] ?? 0,
             'total_carbs'    => $validated['total_carbs'] ?? 0,
@@ -101,5 +144,32 @@ class RecipeController extends Controller
         $recipe->delete();
 
         return back();
+    }
+
+    private function normalizeInstructions(array $instructions): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (mixed $instruction): string => trim((string) $instruction),
+            $instructions,
+        )));
+    }
+
+    private function ingredientSearchError(?array $error): ?array
+    {
+        if ($error === null) {
+            return null;
+        }
+
+        $code = (int) ($error['code'] ?? 0);
+
+        return [
+            'code' => $code ?: null,
+            'message' => match ($code) {
+                5, 8 => 'Les identifiants FatSecret sont invalides.',
+                21 => "FatSecret bloque l'adresse IP actuelle.",
+                14 => "Le compte FatSecret n'a pas le niveau d'acces requis.",
+                default => 'La recherche FatSecret est temporairement indisponible.',
+            },
+        ];
     }
 }

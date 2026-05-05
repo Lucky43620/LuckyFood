@@ -10,12 +10,13 @@ class Recipe extends Model
 {
     protected $fillable = [
         'user_id', 'name', 'servings', 'prep_time', 'category',
-        'tags', 'is_public', 'total_calories', 'total_protein',
+        'tags', 'instructions', 'is_public', 'total_calories', 'total_protein',
         'total_carbs', 'total_fat',
     ];
 
     protected $casts = [
         'tags'          => 'array',
+        'instructions'  => 'array',
         'is_public'     => 'boolean',
         'total_protein' => 'decimal:2',
         'total_carbs'   => 'decimal:2',

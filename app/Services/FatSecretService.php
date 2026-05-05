@@ -410,15 +410,15 @@ class FatSecretService
         $servings = $this->asList($servings);
 
         foreach ($servings as $serving) {
-            if ((string) ($serving['is_default'] ?? '') === '1') {
+            $description = strtolower(str_replace(' ', '', (string) ($serving['serving_description'] ?? '')));
+
+            if (in_array($description, ['100g', '100ml'], true)) {
                 return $serving;
             }
         }
 
         foreach ($servings as $serving) {
-            $description = strtolower(str_replace(' ', '', (string) ($serving['serving_description'] ?? '')));
-
-            if (in_array($description, ['100g', '100ml'], true)) {
+            if ((string) ($serving['is_default'] ?? '') === '1') {
                 return $serving;
             }
         }
