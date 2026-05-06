@@ -11,7 +11,9 @@ class WaterTracking extends Model
 
     protected $fillable = ['user_id', 'date', 'glasses'];
 
-    protected $casts = [];
+    protected $casts = [
+        'glasses' => 'integer',
+    ];
 
     public function user(): BelongsTo
     {

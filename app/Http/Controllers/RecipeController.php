@@ -2,18 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Integrations\FatSecret\FatSecretErrorPresenter;
+use App\Http\Requests\SearchRecipeIngredientsRequest;
+use App\Http\Requests\StoreRecipeRequest;
 use App\Models\Recipe;
 use App\Models\RecipeIngredient;
 use App\Services\FatSecretService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class RecipeController extends Controller
 {
-    public function __construct(private FatSecretService $fatSecret) {}
+    public function __construct(
+        private readonly FatSecretService $fatSecret,
+        private readonly FatSecretErrorPresenter $errors,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -32,9 +40,9 @@ class RecipeController extends Controller
         return Inertia::render('Recettes/Create');
     }
 
-    public function searchIngredients(Request $request): JsonResponse
+    public function searchIngredients(SearchRecipeIngredientsRequest $request): JsonResponse
     {
-        $query = trim((string) $request->input('q', ''));
+        $query = $request->queryText();
 
         if (strlen($query) < 2) {
             return response()->json([
@@ -43,7 +51,7 @@ class RecipeController extends Controller
             ]);
         }
 
-        $search = $this->fatSecret->searchFoodsPage(
+        $search = $this->fatSecret->searchFoodsPageResult(
             $query,
             0,
             10,
@@ -62,85 +70,66 @@ class RecipeController extends Controller
                     'carbs' => (float) ($food['carbs'] ?? 0),
                     'fat' => (float) ($food['fat'] ?? 0),
                 ],
-                $search['results'],
+                $search->data()['results'],
             )),
-            'error' => $this->ingredientSearchError($this->fatSecret->lastError()),
+            'error' => $this->errors->ingredient($search->error()),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreRecipeRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name'           => 'required|string|max:255',
-            'servings'       => 'required|integer|min:1',
-            'prep_time'      => 'required|integer|min:0',
-            'tags'           => 'nullable|array',
-            'tags.*'         => 'string|max:100',
-            'instructions'    => 'nullable|array',
-            'instructions.*'  => 'nullable|string|max:2000',
-            'total_calories' => 'required|integer|min:0',
-            'total_protein'  => 'nullable|numeric|min:0',
-            'total_carbs'    => 'nullable|numeric|min:0',
-            'total_fat'      => 'nullable|numeric|min:0',
-            'ingredients'    => 'required|array|min:1',
-            'ingredients.*.food_id'   => 'required|string',
-            'ingredients.*.food_name' => 'required|string',
-            'ingredients.*.quantity'  => 'required|numeric|min:0',
-            'ingredients.*.unit'      => 'nullable|string',
-            'ingredients.*.calories'  => 'nullable|integer|min:0',
-            'ingredients.*.protein'   => 'nullable|numeric|min:0',
-            'ingredients.*.carbs'     => 'nullable|numeric|min:0',
-            'ingredients.*.fat'       => 'nullable|numeric|min:0',
-        ]);
+        $validated = $request->validated();
 
-        $recipe = Recipe::create([
-            'user_id'        => $request->user()->id,
-            'name'           => $validated['name'],
-            'servings'       => $validated['servings'],
-            'prep_time'      => $validated['prep_time'],
-            'tags'           => $validated['tags'] ?? [],
-            'instructions'    => $this->normalizeInstructions($validated['instructions'] ?? []),
-            'total_calories' => $validated['total_calories'],
-            'total_protein'  => $validated['total_protein'] ?? 0,
-            'total_carbs'    => $validated['total_carbs'] ?? 0,
-            'total_fat'      => $validated['total_fat'] ?? 0,
-        ]);
+        DB::transaction(function () use ($request, $validated): void {
+            $recipe = Recipe::create([
+                'user_id' => $request->user()->id,
+                'name' => $validated['name'],
+                'servings' => $validated['servings'],
+                'prep_time' => $validated['prep_time'],
+                'tags' => $validated['tags'] ?? [],
+                'instructions' => $this->normalizeInstructions($validated['instructions'] ?? []),
+                'total_calories' => $validated['total_calories'],
+                'total_protein' => $validated['total_protein'] ?? 0,
+                'total_carbs' => $validated['total_carbs'] ?? 0,
+                'total_fat' => $validated['total_fat'] ?? 0,
+            ]);
 
-        $ingredients = array_map(fn($ing) => [
-            'recipe_id' => $recipe->id,
-            'food_id'   => $ing['food_id'],
-            'food_name' => $ing['food_name'],
-            'quantity'  => $ing['quantity'],
-            'unit'      => $ing['unit'] ?? 'g',
-            'calories'  => $ing['calories'] ?? 0,
-            'protein'   => $ing['protein'] ?? 0,
-            'carbs'     => $ing['carbs'] ?? 0,
-            'fat'       => $ing['fat'] ?? 0,
-        ], $validated['ingredients']);
+            $ingredients = array_map(fn (array $ing): array => [
+                'recipe_id' => $recipe->id,
+                'food_id' => $ing['food_id'],
+                'food_name' => $ing['food_name'],
+                'quantity' => $ing['quantity'],
+                'unit' => $ing['unit'] ?? 'g',
+                'calories' => $ing['calories'] ?? 0,
+                'protein' => $ing['protein'] ?? 0,
+                'carbs' => $ing['carbs'] ?? 0,
+                'fat' => $ing['fat'] ?? 0,
+            ], $validated['ingredients']);
 
-        RecipeIngredient::insert($ingredients);
+            RecipeIngredient::insert($ingredients);
+        });
 
         return redirect()->route('recipes.index');
     }
 
     public function show(Recipe $recipe): Response
     {
-        abort_unless($recipe->user_id === request()->user()->id, 403);
+        Gate::authorize('view', $recipe);
 
         return Inertia::render('Recettes/Show', [
-            'recipe'      => $recipe->load('ingredients'),
-            'perServing'  => [
+            'recipe' => $recipe->load('ingredients'),
+            'perServing' => [
                 'calories' => $recipe->caloriesPerServing(),
-                'protein'  => $recipe->servings > 0 ? round($recipe->total_protein / $recipe->servings, 1) : 0,
-                'carbs'    => $recipe->servings > 0 ? round($recipe->total_carbs   / $recipe->servings, 1) : 0,
-                'fat'      => $recipe->servings > 0 ? round($recipe->total_fat     / $recipe->servings, 1) : 0,
+                'protein' => $recipe->servings > 0 ? round($recipe->total_protein / $recipe->servings, 1) : 0,
+                'carbs' => $recipe->servings > 0 ? round($recipe->total_carbs / $recipe->servings, 1) : 0,
+                'fat' => $recipe->servings > 0 ? round($recipe->total_fat / $recipe->servings, 1) : 0,
             ],
         ]);
     }
 
     public function destroy(Recipe $recipe): RedirectResponse
     {
-        abort_unless($recipe->user_id === request()->user()->id, 403);
+        Gate::authorize('delete', $recipe);
         $recipe->delete();
 
         return back();
@@ -152,24 +141,5 @@ class RecipeController extends Controller
             static fn (mixed $instruction): string => trim((string) $instruction),
             $instructions,
         )));
-    }
-
-    private function ingredientSearchError(?array $error): ?array
-    {
-        if ($error === null) {
-            return null;
-        }
-
-        $code = (int) ($error['code'] ?? 0);
-
-        return [
-            'code' => $code ?: null,
-            'message' => match ($code) {
-                5, 8 => 'Les identifiants FatSecret sont invalides.',
-                21 => "FatSecret bloque l'adresse IP actuelle.",
-                14 => "Le compte FatSecret n'a pas le niveau d'acces requis.",
-                default => 'La recherche FatSecret est temporairement indisponible.',
-            },
-        ];
     }
 }

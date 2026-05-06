@@ -13,10 +13,11 @@ class RecipeIngredient extends Model
     ];
 
     protected $casts = [
+        'calories' => 'integer',
         'quantity' => 'decimal:2',
-        'protein'  => 'decimal:2',
-        'carbs'    => 'decimal:2',
-        'fat'      => 'decimal:2',
+        'protein' => 'decimal:2',
+        'carbs' => 'decimal:2',
+        'fat' => 'decimal:2',
     ];
 
     public function recipe(): BelongsTo

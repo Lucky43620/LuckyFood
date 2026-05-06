@@ -11,6 +11,7 @@ class FatSecretOAuth1Authenticator implements Authenticator
     public function __construct(
         private readonly string $consumerKey,
         private readonly string $consumerSecret,
+        private readonly FatSecretOAuth1Signature $signature = new FatSecretOAuth1Signature,
     ) {}
 
     public function set(PendingRequest $pendingRequest): void
@@ -23,16 +24,19 @@ class FatSecretOAuth1Authenticator implements Authenticator
             'oauth_version' => '1.0',
         ];
 
+        $url = $pendingRequest->getUrl();
         $signatureParams = array_merge(
+            $this->urlQueryParameters($url),
             $pendingRequest->query()->all(),
             $this->bodyParameters($pendingRequest),
             $oauth,
         );
 
-        $oauth['oauth_signature'] = $this->signature(
+        $oauth['oauth_signature'] = $this->signature->make(
             $pendingRequest->getMethod()->value,
-            $pendingRequest->getUrl(),
+            $url,
             $signatureParams,
+            $this->consumerSecret,
         );
 
         if ($pendingRequest->getMethod() === Method::GET || $pendingRequest->body() === null) {
@@ -53,39 +57,19 @@ class FatSecretOAuth1Authenticator implements Authenticator
         return is_array($body) ? $body : [];
     }
 
-    private function signature(string $method, string $url, array $parameters): string
+    /**
+     * @return array<string, mixed>
+     */
+    private function urlQueryParameters(string $url): array
     {
-        $pairs = [];
+        $query = parse_url($url, PHP_URL_QUERY);
 
-        foreach ($parameters as $key => $value) {
-            if (is_array($value)) {
-                foreach ($value as $nestedValue) {
-                    $pairs[] = [$this->encode((string) $key), $this->encode((string) $nestedValue)];
-                }
-
-                continue;
-            }
-
-            $pairs[] = [$this->encode((string) $key), $this->encode((string) $value)];
+        if (! is_string($query) || $query === '') {
+            return [];
         }
 
-        usort($pairs, static fn (array $left, array $right): int => $left[0] === $right[0]
-            ? strcmp($left[1], $right[1])
-            : strcmp($left[0], $right[0]));
+        parse_str($query, $parameters);
 
-        $normalized = implode('&', array_map(
-            static fn (array $pair): string => $pair[0].'='.$pair[1],
-            $pairs,
-        ));
-
-        $base = strtoupper($method).'&'.$this->encode($url).'&'.$this->encode($normalized);
-        $key = $this->encode($this->consumerSecret).'&';
-
-        return base64_encode(hash_hmac('sha1', $base, $key, true));
-    }
-
-    private function encode(string $value): string
-    {
-        return str_replace('%7E', '~', rawurlencode($value));
+        return is_array($parameters) ? $parameters : [];
     }
 }

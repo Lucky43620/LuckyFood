@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateWaterRequest;
 use App\Models\FoodDiaryEntry;
 use App\Models\UserGoal;
 use App\Models\WaterTracking;
@@ -13,7 +14,7 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request): Response
     {
-        $user  = $request->user();
+        $user = $request->user();
         $today = now()->toDateString();
 
         $goal = UserGoal::firstOrCreate(
@@ -32,25 +33,25 @@ class DashboardController extends Controller
 
         $totals = [
             'calories' => $entries->sum('calories'),
-            'protein'  => round($entries->sum('protein'), 1),
-            'carbs'    => round($entries->sum('carbs'), 1),
-            'fat'      => round($entries->sum('fat'), 1),
-            'fiber'    => round($entries->sum('fiber'), 1),
+            'protein' => round($entries->sum('protein'), 1),
+            'carbs' => round($entries->sum('carbs'), 1),
+            'fat' => round($entries->sum('fat'), 1),
+            'fiber' => round($entries->sum('fiber'), 1),
         ];
 
         return Inertia::render('Dashboard', [
-            'goal'   => $goal,
+            'goal' => $goal,
             'totals' => $totals,
-            'meals'  => $entries->groupBy('meal_type'),
-            'water'  => $water->glasses,
-            'date'   => $today,
+            'meals' => $entries->groupBy('meal_type'),
+            'water' => $water->glasses,
+            'date' => $today,
         ]);
     }
 
-    public function updateWater(Request $request): void
+    public function updateWater(UpdateWaterRequest $request): void
     {
-        $validated = $request->validate(['water' => 'required|integer|min:0|max:30']);
-        $today     = now()->toDateString();
+        $validated = $request->validated();
+        $today = now()->toDateString();
 
         WaterTracking::updateOrCreate(
             ['user_id' => $request->user()->id, 'date' => $today],

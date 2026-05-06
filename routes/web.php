@@ -6,16 +6,13 @@ use App\Http\Controllers\FoodSearchController;
 use App\Http\Controllers\ProgressionController;
 use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\UserGoalController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin'    => Route::has('login'),
-        'canRegister' => Route::has('register'),
-    ]);
-})->name('home');
+Route::get('/', fn () => Inertia::render('Welcome', [
+    'canLogin' => Route::has('login'),
+    'canRegister' => Route::has('register'),
+]))->name('home');
 
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
     ->group(function () {
@@ -31,12 +28,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
         // ── Recherche ───────────────────────────────────────────────────────────
         Route::get('/recherche', [FoodSearchController::class, 'index'])->name('search.index');
-        Route::get('/recherche/autocomplete', [FoodSearchController::class, 'autocomplete'])->name('search.autocomplete');
-        Route::get('/recherche/code-barre', [FoodSearchController::class, 'barcode'])->name('search.barcode');
+        Route::get('/recherche/autocomplete', [FoodSearchController::class, 'autocomplete'])
+            ->middleware('throttle:fatsecret')
+            ->name('search.autocomplete');
+        Route::get('/recherche/code-barre', [FoodSearchController::class, 'barcode'])
+            ->middleware('throttle:fatsecret')
+            ->name('search.barcode');
         Route::get('/recherche/aliment/{foodId}', [FoodSearchController::class, 'show'])->name('search.show');
 
         // ── Recettes ────────────────────────────────────────────────────────────
-        Route::get('/recettes/ingredients/search', [RecipeController::class, 'searchIngredients'])->name('recipes.ingredients.search');
+        Route::get('/recettes/ingredients/search', [RecipeController::class, 'searchIngredients'])
+            ->middleware('throttle:fatsecret')
+            ->name('recipes.ingredients.search');
         Route::resource('recettes', RecipeController::class)
             ->names('recipes')
             ->parameters(['recettes' => 'recipe'])

@@ -1,6 +1,6 @@
-import defaultTheme from 'tailwindcss/defaultTheme';
-import forms from '@tailwindcss/forms';
-import typography from '@tailwindcss/typography';
+import defaultTheme from 'tailwindcss/defaultTheme'
+import forms from '@tailwindcss/forms'
+import typography from '@tailwindcss/typography'
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -15,15 +15,15 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans:    ['Plus Jakarta Sans', ...defaultTheme.fontFamily.sans],
+                sans: ['Plus Jakarta Sans', ...defaultTheme.fontFamily.sans],
                 display: ['DM Serif Display', 'Georgia', 'serif'],
-                mono:    ['JetBrains Mono', ...defaultTheme.fontFamily.mono],
+                mono: ['JetBrains Mono', ...defaultTheme.fontFamily.mono],
             },
 
             colors: {
                 // Primaire vert
                 green: {
-                    50:  'oklch(97% 0.04 145)',
+                    50: 'oklch(97% 0.04 145)',
                     100: 'oklch(93% 0.08 145)',
                     200: 'oklch(87% 0.12 145)',
                     400: 'oklch(71% 0.18 145)',
@@ -33,7 +33,7 @@ export default {
                 },
                 // Accent orange
                 orange: {
-                    50:  'oklch(97% 0.04 55)',
+                    50: 'oklch(97% 0.04 55)',
                     100: 'oklch(93% 0.08 55)',
                     500: 'oklch(72% 0.18 55)',
                     600: 'oklch(64% 0.18 55)',
@@ -60,9 +60,9 @@ export default {
                 },
                 // Neutres chauds
                 neutral: {
-                    0:   '#FFFFFF',
-                    25:  '#FAFAF8',
-                    50:  '#F5F4F0',
+                    0: '#FFFFFF',
+                    25: '#FAFAF8',
+                    50: '#F5F4F0',
                     100: '#EEECEA',
                     200: '#E0DDD9',
                     300: '#CCCAC5',
@@ -76,10 +76,10 @@ export default {
             },
 
             borderRadius: {
-                sm:   '6px',
-                md:   '10px',
-                lg:   '16px',
-                xl:   '24px',
+                sm: '6px',
+                md: '10px',
+                lg: '16px',
+                xl: '24px',
                 pill: '9999px',
             },
 
@@ -91,10 +91,10 @@ export default {
 
             transitionTimingFunction: {
                 spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                out:    'cubic-bezier(0.22, 1, 0.36, 1)',
+                out: 'cubic-bezier(0.22, 1, 0.36, 1)',
             },
         },
     },
 
     plugins: [forms, typography],
-};
+}

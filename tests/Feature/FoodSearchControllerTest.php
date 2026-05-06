@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Integrations\FatSecret\Data\FatSecretApiError;
+use App\Http\Integrations\FatSecret\Data\FatSecretApiResult;
 use App\Models\User;
 use App\Services\FatSecretService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,10 +24,10 @@ class FoodSearchControllerTest extends TestCase
 
         $fatSecret = Mockery::mock(FatSecretService::class);
         $fatSecret
-            ->shouldReceive('searchFoodsPage')
+            ->shouldReceive('searchFoodsPageResult')
             ->once()
             ->with('poulet', 0, 20, 'BE', 'fr', null)
-            ->andReturn([
+            ->andReturn(FatSecretApiResult::success([
                 'results' => [
                     [
                         'food_id' => '1',
@@ -40,16 +42,12 @@ class FoodSearchControllerTest extends TestCase
                 ],
                 'pagination' => $this->pagination(total: 1),
                 'effective_query' => '',
-            ]);
+            ]));
         $fatSecret
-            ->shouldReceive('lastError')
-            ->once()
-            ->andReturn(null);
-        $fatSecret
-            ->shouldReceive('getFoodCategories')
+            ->shouldReceive('getFoodCategoriesResult')
             ->once()
             ->with('BE', 'fr')
-            ->andReturn([]);
+            ->andReturn(FatSecretApiResult::success([]));
 
         $this->app->instance(FatSecretService::class, $fatSecret);
 
@@ -75,29 +73,24 @@ class FoodSearchControllerTest extends TestCase
 
         $fatSecret = Mockery::mock(FatSecretService::class);
         $fatSecret
-            ->shouldReceive('searchFoodsPage')
+            ->shouldReceive('searchFoodsPageResult')
             ->once()
             ->with('poulet', 0, 20, 'FR', 'fr', null)
-            ->andReturn([
+            ->andReturn(FatSecretApiResult::failure([
                 'results' => [],
                 'pagination' => $this->pagination(total: 0),
                 'effective_query' => '',
-            ]);
+            ], new FatSecretApiError(
+                operation: 'search.oauth1',
+                status: 200,
+                code: '8',
+                message: 'Invalid signature: please refer to the documentation',
+            )));
         $fatSecret
-            ->shouldReceive('lastError')
-            ->once()
-            ->andReturn([
-                'operation' => 'search.oauth1',
-                'status' => 200,
-                'code' => '8',
-                'message' => 'Invalid signature: please refer to the documentation',
-                'ip' => null,
-            ]);
-        $fatSecret
-            ->shouldReceive('getFoodCategories')
+            ->shouldReceive('getFoodCategoriesResult')
             ->once()
             ->with('FR', 'fr')
-            ->andReturn([]);
+            ->andReturn(FatSecretApiResult::success([]));
 
         $this->app->instance(FatSecretService::class, $fatSecret);
 
@@ -123,10 +116,10 @@ class FoodSearchControllerTest extends TestCase
 
         $fatSecret = Mockery::mock(FatSecretService::class);
         $fatSecret
-            ->shouldReceive('getFood')
+            ->shouldReceive('getFoodResult')
             ->once()
             ->with('1641', 'FR', 'fr')
-            ->andReturn([
+            ->andReturn(FatSecretApiResult::success([
                 'food_id' => '1641',
                 'food_name' => 'Blanc de Poulet',
                 'servings' => [
@@ -138,11 +131,7 @@ class FoodSearchControllerTest extends TestCase
                         ],
                     ],
                 ],
-            ]);
-        $fatSecret
-            ->shouldReceive('lastError')
-            ->once()
-            ->andReturn(null);
+            ]));
 
         $this->app->instance(FatSecretService::class, $fatSecret);
 
@@ -166,18 +155,14 @@ class FoodSearchControllerTest extends TestCase
 
         $fatSecret = Mockery::mock(FatSecretService::class);
         $fatSecret
-            ->shouldReceive('searchByBarcode')
+            ->shouldReceive('searchByBarcodeResult')
             ->once()
             ->with('3017620422003', 'FR', 'fr')
-            ->andReturn([
+            ->andReturn(FatSecretApiResult::success([
                 'food_id' => '99999',
                 'food_name' => 'Nutella',
                 'servings' => ['serving' => []],
-            ]);
-        $fatSecret
-            ->shouldReceive('lastError')
-            ->once()
-            ->andReturn(null);
+            ]));
 
         $this->app->instance(FatSecretService::class, $fatSecret);
 

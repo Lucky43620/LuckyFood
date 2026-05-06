@@ -26,6 +26,8 @@ return new class extends Migration
             $table->enum('goal_type', ['lose', 'maintain', 'gain'])->default('maintain');
             $table->enum('gender', ['male', 'female', 'other'])->nullable();
             $table->timestamps();
+
+            $table->unique('user_id');
         });
     }
 

@@ -15,12 +15,15 @@ class Recipe extends Model
     ];
 
     protected $casts = [
-        'tags'          => 'array',
-        'instructions'  => 'array',
-        'is_public'     => 'boolean',
+        'tags' => 'array',
+        'instructions' => 'array',
+        'is_public' => 'boolean',
+        'servings' => 'integer',
+        'prep_time' => 'integer',
+        'total_calories' => 'integer',
         'total_protein' => 'decimal:2',
-        'total_carbs'   => 'decimal:2',
-        'total_fat'     => 'decimal:2',
+        'total_carbs' => 'decimal:2',
+        'total_fat' => 'decimal:2',
     ];
 
     public function user(): BelongsTo

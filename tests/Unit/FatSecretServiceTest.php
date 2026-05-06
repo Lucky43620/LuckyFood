@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Http\Integrations\FatSecret\FatSecretOAuth1Signature;
 use App\Http\Integrations\FatSecret\Requests\AutocompleteRequest;
 use App\Http\Integrations\FatSecret\Requests\GetFoodCategoriesRequest;
 use App\Http\Integrations\FatSecret\Requests\GetFoodPremierRequest;
@@ -54,7 +55,7 @@ class FatSecretServiceTest extends TestCase
         $this->assertSame(3.28, $results[0]['carbs']);
         $this->assertSame(0.34, $results[0]['fat']);
         $this->assertSame('100 g', $results[0]['serving_description']);
-        $this->assertNull($service->lastError());
+        $this->assertTrue($service->searchFoodsPageResult('champignons')->ok());
     }
 
     public function test_search_foods_page_returns_pagination(): void
@@ -98,6 +99,64 @@ class FatSecretServiceTest extends TestCase
         $this->assertTrue($page['pagination']['has_next']);
     }
 
+    public function test_search_foods_page_handles_malformed_food_items(): void
+    {
+        MockClient::global([
+            SearchFoodsPremierRequest::class => MockResponse::make([
+                'foods_search' => [
+                    'results' => [
+                        'food' => [
+                            'unexpected string',
+                            [
+                                'food_id' => '',
+                                'food_name' => 'Missing identifier',
+                            ],
+                            [
+                                'food_id' => '1641',
+                                'food_name' => 'Chicken Breast',
+                                'servings' => [
+                                    'serving' => [
+                                        'serving_description' => '100 g',
+                                        'calories' => '195',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'max_results' => '20',
+                    'page_number' => '0',
+                    'total_results' => '3',
+                ],
+            ]),
+        ]);
+
+        $page = $this->service()->searchFoodsPage('poulet');
+
+        $this->assertCount(1, $page['results']);
+        $this->assertSame('1641', $page['results'][0]['food_id']);
+    }
+
+    public function test_search_foods_page_keeps_empty_display_range_when_total_has_no_displayable_results(): void
+    {
+        MockClient::global([
+            SearchFoodsPremierRequest::class => MockResponse::make([
+                'foods_search' => [
+                    'results' => ['food' => []],
+                    'max_results' => '20',
+                    'page_number' => '0',
+                    'total_results' => '10',
+                ],
+            ]),
+        ]);
+
+        $page = $this->service()->searchFoodsPage('poulet');
+
+        $this->assertSame(10, $page['pagination']['total']);
+        $this->assertSame(0, $page['pagination']['from']);
+        $this->assertSame(0, $page['pagination']['to']);
+        $this->assertFalse($page['pagination']['has_next']);
+    }
+
     public function test_search_foods_returns_empty_on_api_failure(): void
     {
         MockClient::global([
@@ -111,9 +170,11 @@ class FatSecretServiceTest extends TestCase
 
         $service = $this->service();
 
-        $this->assertSame([], $service->searchFoods('chicken'));
-        $this->assertSame('8', $service->lastError()['code']);
-        $this->assertSame('Invalid signature: please refer to the documentation', $service->lastError()['message']);
+        $result = $service->searchFoodsPageResult('chicken');
+
+        $this->assertSame([], $result->data()['results']);
+        $this->assertSame('8', $result->error()?->code);
+        $this->assertSame('Invalid signature: please refer to the documentation', $result->error()?->message);
     }
 
     public function test_autocomplete_returns_suggestions_from_premier(): void
@@ -182,8 +243,10 @@ class FatSecretServiceTest extends TestCase
 
         $service = $this->service();
 
-        $this->assertNull($service->getFood('1641'));
-        $this->assertSame('8', $service->lastError()['code']);
+        $result = $service->getFoodResult('1641');
+
+        $this->assertNull($result->data());
+        $this->assertSame('8', $result->error()?->code);
     }
 
     public function test_search_by_barcode_returns_normalized_food(): void
@@ -232,8 +295,10 @@ class FatSecretServiceTest extends TestCase
 
         $service = $this->service();
 
-        $this->assertNull($service->searchByBarcode('0000000000000'));
-        $this->assertSame('106', $service->lastError()['code']);
+        $result = $service->searchByBarcodeResult('0000000000000');
+
+        $this->assertNull($result->data());
+        $this->assertSame('106', $result->error()?->code);
     }
 
     public function test_get_food_categories_returns_list(): void
@@ -285,10 +350,38 @@ class FatSecretServiceTest extends TestCase
 
     public function test_missing_oauth1_credentials_are_handled(): void
     {
-        $service = new FatSecretService();
+        $service = new FatSecretService;
+        $result = $service->searchFoodsPageResult('chicken');
 
-        $this->assertSame([], $service->searchFoods('chicken'));
-        $this->assertSame('FatSecret OAuth1 credentials are missing.', $service->lastError()['message']);
+        $this->assertSame([], $result->data()['results']);
+        $this->assertSame('FatSecret OAuth1 credentials are missing.', $result->error()?->message);
+    }
+
+    public function test_oauth1_signature_uses_normalized_url_without_query_string(): void
+    {
+        $signature = new FatSecretOAuth1Signature;
+
+        $result = $signature->make('GET', 'https://platform.fatsecret.com/rest/foods/search/v5?ignored=true', [
+            'format' => 'json',
+            'oauth_consumer_key' => 'key',
+            'oauth_nonce' => 'nonce',
+            'oauth_signature_method' => 'HMAC-SHA1',
+            'oauth_timestamp' => '1700000000',
+            'oauth_version' => '1.0',
+            'search_expression' => 'poulet',
+        ], 'secret');
+
+        $expected = $signature->make('GET', 'https://platform.fatsecret.com/rest/foods/search/v5', [
+            'format' => 'json',
+            'oauth_consumer_key' => 'key',
+            'oauth_nonce' => 'nonce',
+            'oauth_signature_method' => 'HMAC-SHA1',
+            'oauth_timestamp' => '1700000000',
+            'oauth_version' => '1.0',
+            'search_expression' => 'poulet',
+        ], 'secret');
+
+        $this->assertSame($expected, $result);
     }
 
     private function service(): FatSecretService

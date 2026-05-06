@@ -2,22 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Integrations\FatSecret\FatSecretErrorPresenter;
+use App\Http\Requests\AutocompleteFoodRequest;
+use App\Http\Requests\BarcodeFoodRequest;
+use App\Http\Requests\SearchFoodRequest;
+use App\Http\Requests\ShowFoodRequest;
 use App\Services\FatSecretService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class FoodSearchController extends Controller
 {
-    public function __construct(private FatSecretService $fatSecret) {}
+    public function __construct(
+        private readonly FatSecretService $fatSecret,
+        private readonly FatSecretErrorPresenter $errors,
+    ) {}
 
-    public function index(Request $request): Response
+    public function index(SearchFoodRequest $request): Response
     {
-        $query = $request->input('q', '');
-        $meal = $request->input('meal', 'breakfast');
-        $pageNumber = max(0, (int) $request->input('page', 0));
-        $categoryId = $request->integer('category_id') ?: null;
+        $query = $request->queryText();
+        $meal = $request->meal();
+        $pageNumber = $request->pageNumber();
+        $categoryId = $request->categoryId();
         $results = [];
         $pagination = $this->emptyPagination($pageNumber);
         $searchError = null;
@@ -25,13 +32,13 @@ class FoodSearchController extends Controller
         $language = $request->user()?->fatsecret_language ?? 'fr';
 
         if (strlen(trim($query)) >= 2) {
-            $search = $this->fatSecret->searchFoodsPage($query, $pageNumber, 20, $region, $language, $categoryId);
-            $results = $search['results'];
-            $pagination = $search['pagination'];
-            $searchError = $this->formatSearchError($this->fatSecret->lastError());
+            $search = $this->fatSecret->searchFoodsPageResult($query, $pageNumber, 20, $region, $language, $categoryId);
+            $results = $search->data()['results'];
+            $pagination = $search->data()['pagination'];
+            $searchError = $this->errors->search($search->error());
         }
 
-        $categories = $this->fatSecret->getFoodCategories($region, $language);
+        $categories = $this->fatSecret->getFoodCategoriesResult($region, $language);
 
         return Inertia::render('Search', [
             'query' => $query,
@@ -39,86 +46,62 @@ class FoodSearchController extends Controller
             'meal' => $meal,
             'pagination' => $pagination,
             'searchError' => $searchError,
-            'categories' => $categories,
+            'categories' => $categories->data(),
             'categoryId' => $categoryId,
         ]);
     }
 
-    public function show(Request $request, string $foodId): Response
+    public function show(ShowFoodRequest $request, string $foodId): Response
     {
-        $food = $this->fatSecret->getFood(
+        $food = $this->fatSecret->getFoodResult(
             $foodId,
             region: $request->user()?->fatsecret_region ?? 'FR',
             language: $request->user()?->fatsecret_language ?? 'fr',
         );
 
         return Inertia::render('Search/Show', [
-            'food' => $food,
-            'meal' => $request->input('meal', 'breakfast'),
-            'query' => $request->input('q', ''),
-            'searchError' => $this->formatSearchError($this->fatSecret->lastError()),
+            'food' => $food->data(),
+            'meal' => $request->meal(),
+            'query' => $request->queryText(),
+            'searchError' => $this->errors->search($food->error()),
         ]);
     }
 
-    public function autocomplete(Request $request): JsonResponse
+    public function autocomplete(AutocompleteFoodRequest $request): JsonResponse
     {
-        $query = $request->input('q', '');
-        $suggestions = strlen(trim($query)) >= 2
-            ? $this->fatSecret->autocomplete(
+        $query = $request->queryText();
+        $suggestions = strlen($query) >= 2
+            ? $this->fatSecret->autocompleteResult(
                 $query,
                 region: $request->user()?->fatsecret_region ?? 'FR',
                 language: $request->user()?->fatsecret_language ?? 'fr',
             )
-            : [];
+            : null;
 
-        return response()->json($suggestions);
+        return response()->json($suggestions?->data() ?? []);
     }
 
-    public function barcode(Request $request): Response
+    public function barcode(BarcodeFoodRequest $request): Response
     {
-        $barcode = trim((string) $request->input('barcode', ''));
+        $barcode = $request->barcode();
         $food = null;
+        $searchError = null;
 
         if ($barcode !== '') {
-            $food = $this->fatSecret->searchByBarcode(
+            $food = $this->fatSecret->searchByBarcodeResult(
                 $barcode,
                 region: $request->user()?->fatsecret_region ?? 'FR',
                 language: $request->user()?->fatsecret_language ?? 'fr',
             );
+            $searchError = $this->errors->search($food->error());
         }
 
         return Inertia::render('Search/Show', [
-            'food' => $food,
-            'meal' => $request->input('meal', 'breakfast'),
+            'food' => $food?->data(),
+            'meal' => $request->meal(),
             'query' => '',
-            'searchError' => $this->formatSearchError($this->fatSecret->lastError()),
+            'searchError' => $searchError,
         ]);
-    }
-
-    private function formatSearchError(?array $error): ?array
-    {
-        if ($error === null) {
-            return null;
-        }
-
-        $code = (int) ($error['code'] ?? 0);
-        $ip = $error['ip'] ?? null;
-
-        $message = match ($code) {
-            5 => "FatSecret refuse la Consumer Key OAuth1. Verifiez les identifiants OAuth1.",
-            8 => "FatSecret refuse la signature OAuth1. Verifiez le Consumer Secret OAuth1.",
-            21 => $ip
-                ? "FatSecret bloque l'adresse IP actuelle ($ip). Ajoutez cette IP dans les parametres FatSecret, puis relancez la recherche."
-                : "FatSecret bloque l'adresse IP actuelle. Ajoutez l'IP du serveur dans les parametres FatSecret, puis relancez la recherche.",
-            14 => "FatSecret refuse le niveau d'acces API actuel. Verifiez les droits du compte FatSecret.",
-            default => 'La recherche FatSecret est temporairement indisponible.',
-        };
-
-        return [
-            'code' => $code ?: null,
-            'message' => $message,
-            'ip' => $ip,
-        ];
     }
 
     private function emptyPagination(int $page): array

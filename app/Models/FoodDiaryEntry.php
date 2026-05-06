@@ -14,11 +14,12 @@ class FoodDiaryEntry extends Model
     ];
 
     protected $casts = [
+        'calories' => 'integer',
         'quantity' => 'decimal:2',
-        'protein'  => 'decimal:2',
-        'carbs'    => 'decimal:2',
-        'fat'      => 'decimal:2',
-        'fiber'    => 'decimal:2',
+        'protein' => 'decimal:2',
+        'carbs' => 'decimal:2',
+        'fat' => 'decimal:2',
+        'fiber' => 'decimal:2',
     ];
 
     public function user(): BelongsTo

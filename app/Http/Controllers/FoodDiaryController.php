@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreFoodDiaryEntryRequest;
 use App\Models\FoodDiaryEntry;
 use App\Models\UserGoal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -28,39 +30,28 @@ class FoodDiaryController extends Controller
 
         $totals = [
             'calories' => $entries->sum('calories'),
-            'protein'  => round($entries->sum('protein'), 1),
-            'carbs'    => round($entries->sum('carbs'), 1),
-            'fat'      => round($entries->sum('fat'), 1),
-            'fiber'    => round($entries->sum('fiber'), 1),
+            'protein' => round($entries->sum('protein'), 1),
+            'carbs' => round($entries->sum('carbs'), 1),
+            'fat' => round($entries->sum('fat'), 1),
+            'fiber' => round($entries->sum('fiber'), 1),
         ];
 
         return Inertia::render('Journal', [
-            'date'    => $date,
+            'date' => $date,
             'entries' => $entries,
-            'totals'  => $totals,
-            'goal'    => $goal,
+            'totals' => $totals,
+            'goal' => $goal,
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreFoodDiaryEntryRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'food_id'             => 'required|string|max:255',
-            'food_name'           => 'required|string|max:255',
-            'meal_type'           => 'required|in:breakfast,lunch,snack,dinner',
-            'calories'            => 'required|numeric|min:0',
-            'protein'             => 'nullable|numeric|min:0',
-            'carbs'               => 'nullable|numeric|min:0',
-            'fat'                 => 'nullable|numeric|min:0',
-            'fiber'               => 'nullable|numeric|min:0',
-            'serving_description' => 'nullable|string|max:255',
-            'quantity'            => 'nullable|numeric|min:0',
-        ]);
+        $validated = $request->validated();
 
         FoodDiaryEntry::create([
             ...$validated,
             'user_id' => $request->user()->id,
-            'date'    => now()->toDateString(),
+            'date' => $request->entryDate(),
         ]);
 
         return back();
@@ -68,7 +59,7 @@ class FoodDiaryController extends Controller
 
     public function destroy(FoodDiaryEntry $entry): RedirectResponse
     {
-        abort_unless($entry->user_id === request()->user()->id, 403);
+        Gate::authorize('delete', $entry);
         $entry->delete();
 
         return back();

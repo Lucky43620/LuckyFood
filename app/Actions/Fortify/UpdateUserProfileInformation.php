@@ -21,8 +21,8 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'photo' => ['nullable', 'mimes:jpg,jpeg,png', 'max:1024'],
-            'fatsecret_region' => ['nullable', 'string', 'size:2'],
-            'fatsecret_language' => ['nullable', 'string', 'max:10'],
+            'fatsecret_region' => ['nullable', Rule::in(['FR', 'BE', 'CH', 'CA', 'US', 'GB', 'DE', 'ES', 'IT'])],
+            'fatsecret_language' => ['nullable', Rule::in(['fr', 'en', 'de', 'es', 'it', 'nl'])],
         ])->validateWithBag('updateProfileInformation');
 
         if (isset($input['photo'])) {
