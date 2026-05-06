@@ -46,6 +46,9 @@ jobs:
           touch database/database.sqlite
           php artisan migrate --force
 
+      - name: Build frontend assets
+        run: npm run build
+
       - name: Backend CI
         run: composer run ci:backend
 
