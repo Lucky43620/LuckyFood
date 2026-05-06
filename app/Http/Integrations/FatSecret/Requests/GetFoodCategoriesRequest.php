@@ -2,36 +2,29 @@
 
 namespace App\Http\Integrations\FatSecret\Requests;
 
-use Saloon\Contracts\Body\HasBody;
 use Saloon\Enums\Method;
 use Saloon\Http\Request;
-use Saloon\Traits\Body\HasFormBody;
 
-class GetFoodRequest extends Request implements HasBody
+class GetFoodCategoriesRequest extends Request
 {
-    use HasFormBody;
-
-    protected Method $method = Method::POST;
+    protected Method $method = Method::GET;
 
     public function __construct(
-        private readonly string $foodId,
         private readonly ?string $region = null,
         private readonly ?string $language = null,
     ) {}
 
     public function resolveEndpoint(): string
     {
-        return '/server.api';
+        return '/food_categories/v2';
     }
 
-    protected function defaultBody(): array
+    protected function defaultQuery(): array
     {
         return array_filter([
-            'method' => 'food.get',
-            'food_id' => $this->foodId,
-            'format' => 'json',
             'region' => $this->region,
             'language' => $this->language,
+            'format' => 'json',
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 }

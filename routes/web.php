@@ -32,6 +32,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         // ── Recherche ───────────────────────────────────────────────────────────
         Route::get('/recherche', [FoodSearchController::class, 'index'])->name('search.index');
         Route::get('/recherche/autocomplete', [FoodSearchController::class, 'autocomplete'])->name('search.autocomplete');
+        Route::get('/recherche/code-barre', [FoodSearchController::class, 'barcode'])->name('search.barcode');
         Route::get('/recherche/aliment/{foodId}', [FoodSearchController::class, 'show'])->name('search.show');
 
         // ── Recettes ────────────────────────────────────────────────────────────

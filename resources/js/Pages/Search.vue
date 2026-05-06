@@ -1,10 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
-import { ArrowUpRight, ChevronLeft, ChevronRight, Leaf, Loader2, Plus, Search } from 'lucide-vue-next'
+import { ArrowUpRight, ChevronLeft, ChevronRight, Leaf, Loader2, Plus, Search, ScanLine, LayoutGrid } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import AppInput from '@/Components/ui/AppInput.vue'
 import AppBadge from '@/Components/ui/AppBadge.vue'
+import BarcodeScanner from '@/Components/food/BarcodeScanner.vue'
 
 const props = defineProps({
   query: { type: String, default: '' },
@@ -12,13 +13,17 @@ const props = defineProps({
   meal: { type: String, default: 'breakfast' },
   pagination: { type: Object, default: () => ({}) },
   searchError: { type: Object, default: null },
+  categories: { type: Array, default: () => [] },
+  categoryId: { type: Number, default: null },
 })
 
 const query = ref(props.query)
 const searching = ref(false)
 const selectedMeal = ref(props.meal ?? 'breakfast')
+const selectedCategoryId = ref(props.categoryId)
 const addingFood = ref(null)
 const toast = ref(null)
+const showScanner = ref(false)
 
 const MEALS = [
   { key: 'breakfast', label: 'Petit-déjeuner' },
@@ -32,7 +37,20 @@ const total = computed(() => props.pagination?.total ?? 0)
 const from = computed(() => props.pagination?.from ?? 0)
 const to = computed(() => props.pagination?.to ?? 0)
 
-const pageParams = (targetPage) => ({ q: query.value, meal: selectedMeal.value, page: targetPage })
+const selectedCategoryName = computed(() => {
+  if (!selectedCategoryId.value) return null
+  return props.categories.find(c => c.food_category_id == selectedCategoryId.value)?.food_category_name ?? null
+})
+
+const searchParams = (overrides = {}) => ({
+  q: query.value,
+  meal: selectedMeal.value,
+  page: 0,
+  category_id: selectedCategoryId.value || undefined,
+  ...overrides,
+})
+
+const pageParams = (targetPage) => searchParams({ page: targetPage })
 const detailParams = (food) => ({ foodId: food.food_id, meal: selectedMeal.value, q: query.value })
 
 const fmt = (value, digits = 1) => {
@@ -47,13 +65,26 @@ watch(query, (val) => {
   if (!val.trim()) return
   searching.value = true
   searchTimer = setTimeout(() => {
-    router.get(route('search.index'), { q: val, meal: selectedMeal.value, page: 0 }, {
+    router.get(route('search.index'), searchParams({ q: val, page: 0 }), {
       preserveState: true,
       preserveScroll: true,
       onFinish: () => { searching.value = false },
     })
   }, 350)
 })
+
+function applyCategory(categoryId) {
+  selectedCategoryId.value = categoryId
+  router.get(route('search.index'), searchParams({ category_id: categoryId || undefined, page: 0 }), {
+    preserveState: true,
+    preserveScroll: true,
+  })
+}
+
+function onBarcodeScanned(code) {
+  showScanner.value = false
+  router.get(route('search.barcode'), { barcode: code, meal: selectedMeal.value })
+}
 
 const addToJournal = (food) => {
   addingFood.value = food.food_id
@@ -84,18 +115,33 @@ const addToJournal = (food) => {
     <div class="px-5 md:px-8 py-6">
 
       <!-- Header -->
-      <header class="flex flex-col gap-5 mb-10">
+      <header class="flex flex-col gap-5 mb-8">
         <div>
           <p class="text-xs font-semibold tracking-widest uppercase text-neutral-400 mb-1">Base FatSecret</p>
           <h1 class="font-display text-[30px] leading-tight tracking-tight text-neutral-900">Rechercher</h1>
         </div>
 
         <div class="grid gap-3 lg:grid-cols-[minmax(320px,640px)_auto] lg:items-end">
-          <AppInput
-            v-model="query"
-            placeholder="Ex : poulet, yaourt grec, banane..."
-            :icon="searching ? Loader2 : Search"
-          />
+          <!-- Search input + scanner button -->
+          <div class="flex gap-2">
+            <div class="flex-1">
+              <AppInput
+                v-model="query"
+                placeholder="Ex : poulet, yaourt grec, banane..."
+                :icon="searching ? Loader2 : Search"
+              />
+            </div>
+            <button
+              @click="showScanner = true"
+              class="h-10 w-10 shrink-0 rounded-xl border border-neutral-200 bg-white flex items-center justify-center text-neutral-500 hover:border-green-300 hover:text-green-600 transition-colors"
+              title="Scanner un code-barre"
+              aria-label="Scanner un code-barre"
+            >
+              <ScanLine :size="18" />
+            </button>
+          </div>
+
+          <!-- Meal selector -->
           <div>
             <p class="text-xs font-semibold text-neutral-500 mb-2">Ajouter au repas</p>
             <div class="grid grid-cols-4 gap-2">
@@ -113,6 +159,34 @@ const addToJournal = (food) => {
             </div>
           </div>
         </div>
+
+        <!-- Category filter -->
+        <div v-if="categories.length" class="flex flex-wrap items-center gap-2">
+          <span class="flex items-center gap-1.5 text-xs font-semibold text-neutral-400 shrink-0">
+            <LayoutGrid :size="12" />
+            Catégorie
+          </span>
+          <button
+            @click="applyCategory(null)"
+            class="h-7 px-3 rounded-full text-[11px] font-semibold transition-colors"
+            :class="!selectedCategoryId
+              ? 'bg-green-500 text-white'
+              : 'bg-neutral-100 text-neutral-500 hover:bg-green-50 hover:text-green-600'"
+          >
+            Toutes
+          </button>
+          <button
+            v-for="cat in categories"
+            :key="cat.food_category_id"
+            @click="applyCategory(cat.food_category_id)"
+            class="h-7 px-3 rounded-full text-[11px] font-semibold transition-colors"
+            :class="selectedCategoryId == cat.food_category_id
+              ? 'bg-green-500 text-white'
+              : 'bg-neutral-100 text-neutral-500 hover:bg-green-50 hover:text-green-600'"
+          >
+            {{ cat.food_category_name }}
+          </button>
+        </div>
       </header>
 
       <!-- Error -->
@@ -125,6 +199,10 @@ const addToJournal = (food) => {
         <!-- Pagination bar -->
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
           <p class="text-sm text-neutral-500">
+            <template v-if="selectedCategoryName">
+              <span class="font-semibold text-green-600">{{ selectedCategoryName }}</span>
+              &thinsp;·&thinsp;
+            </template>
             <span class="font-bold text-neutral-800">{{ from }}–{{ to }}</span>
             sur <span class="font-semibold text-neutral-700">{{ total }}</span> résultats
           </p>
@@ -257,7 +335,7 @@ const addToJournal = (food) => {
           <Search :size="28" class="text-green-400" />
         </div>
         <p class="font-semibold text-neutral-600">Rechercher un aliment</p>
-        <p class="text-sm mt-1">Tapez un aliment dans la barre de recherche</p>
+        <p class="text-sm mt-1">Tapez un aliment dans la barre de recherche ou scannez un code-barre</p>
       </div>
     </div>
 
@@ -270,10 +348,22 @@ const addToJournal = (food) => {
         {{ toast }}
       </div>
     </Transition>
+
+    <!-- Barcode scanner modal -->
+    <Transition name="fade">
+      <BarcodeScanner
+        v-if="showScanner"
+        @scanned="onBarcodeScanned"
+        @close="showScanner = false"
+      />
+    </Transition>
   </MainLayout>
 </template>
 
 <style scoped>
 .toast-enter-active, .toast-leave-active { transition: all 0.25s ease; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(10px); }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

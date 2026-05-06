@@ -14,31 +14,33 @@ class FoodSearchController extends Controller
 
     public function index(Request $request): Response
     {
-        $query   = $request->input('q', '');
-        $meal    = $request->input('meal', 'breakfast');
+        $query = $request->input('q', '');
+        $meal = $request->input('meal', 'breakfast');
         $pageNumber = max(0, (int) $request->input('page', 0));
+        $categoryId = $request->integer('category_id') ?: null;
         $results = [];
         $pagination = $this->emptyPagination($pageNumber);
-        $effectiveQuery = '';
         $searchError = null;
-        $region  = $request->user()?->fatsecret_region;
-        $language = $request->user()?->fatsecret_language;
+        $region = $request->user()?->fatsecret_region ?? 'FR';
+        $language = $request->user()?->fatsecret_language ?? 'fr';
 
         if (strlen(trim($query)) >= 2) {
-            $search = $this->fatSecret->searchFoodsPage($query, $pageNumber, 20, $region, $language);
+            $search = $this->fatSecret->searchFoodsPage($query, $pageNumber, 20, $region, $language, $categoryId);
             $results = $search['results'];
             $pagination = $search['pagination'];
-            $effectiveQuery = $search['effective_query'];
             $searchError = $this->formatSearchError($this->fatSecret->lastError());
         }
+
+        $categories = $this->fatSecret->getFoodCategories($region, $language);
 
         return Inertia::render('Search', [
             'query' => $query,
             'results' => $results,
             'meal' => $meal,
             'pagination' => $pagination,
-            'effectiveQuery' => $effectiveQuery,
             'searchError' => $searchError,
+            'categories' => $categories,
+            'categoryId' => $categoryId,
         ]);
     }
 
@@ -46,8 +48,8 @@ class FoodSearchController extends Controller
     {
         $food = $this->fatSecret->getFood(
             $foodId,
-            region: $request->user()?->fatsecret_region,
-            language: $request->user()?->fatsecret_language,
+            region: $request->user()?->fatsecret_region ?? 'FR',
+            language: $request->user()?->fatsecret_language ?? 'fr',
         );
 
         return Inertia::render('Search/Show', [
@@ -60,16 +62,37 @@ class FoodSearchController extends Controller
 
     public function autocomplete(Request $request): JsonResponse
     {
-        $query       = $request->input('q', '');
+        $query = $request->input('q', '');
         $suggestions = strlen(trim($query)) >= 2
             ? $this->fatSecret->autocomplete(
                 $query,
-                region: $request->user()?->fatsecret_region,
-                language: $request->user()?->fatsecret_language,
+                region: $request->user()?->fatsecret_region ?? 'FR',
+                language: $request->user()?->fatsecret_language ?? 'fr',
             )
             : [];
 
         return response()->json($suggestions);
+    }
+
+    public function barcode(Request $request): Response
+    {
+        $barcode = trim((string) $request->input('barcode', ''));
+        $food = null;
+
+        if ($barcode !== '') {
+            $food = $this->fatSecret->searchByBarcode(
+                $barcode,
+                region: $request->user()?->fatsecret_region ?? 'FR',
+                language: $request->user()?->fatsecret_language ?? 'fr',
+            );
+        }
+
+        return Inertia::render('Search/Show', [
+            'food' => $food,
+            'meal' => $request->input('meal', 'breakfast'),
+            'query' => '',
+            'searchError' => $this->formatSearchError($this->fatSecret->lastError()),
+        ]);
     }
 
     private function formatSearchError(?array $error): ?array

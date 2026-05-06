@@ -24,7 +24,7 @@ class FoodSearchControllerTest extends TestCase
         $fatSecret
             ->shouldReceive('searchFoodsPage')
             ->once()
-            ->with('poulet', 0, 20, 'BE', 'fr')
+            ->with('poulet', 0, 20, 'BE', 'fr', null)
             ->andReturn([
                 'results' => [
                     [
@@ -39,12 +39,17 @@ class FoodSearchControllerTest extends TestCase
                     ],
                 ],
                 'pagination' => $this->pagination(total: 1),
-                'effective_query' => 'chicken',
+                'effective_query' => '',
             ]);
         $fatSecret
             ->shouldReceive('lastError')
             ->once()
             ->andReturn(null);
+        $fatSecret
+            ->shouldReceive('getFoodCategories')
+            ->once()
+            ->with('BE', 'fr')
+            ->andReturn([]);
 
         $this->app->instance(FatSecretService::class, $fatSecret);
 
@@ -56,9 +61,9 @@ class FoodSearchControllerTest extends TestCase
                 ->where('query', 'poulet')
                 ->where('meal', 'lunch')
                 ->where('pagination.total', 1)
-                ->where('effectiveQuery', 'chicken')
                 ->where('searchError', null)
-                ->has('results', 1));
+                ->has('results', 1)
+                ->has('categories'));
     }
 
     public function test_search_shows_fatsecret_api_error_without_crashing(): void
@@ -72,7 +77,7 @@ class FoodSearchControllerTest extends TestCase
         $fatSecret
             ->shouldReceive('searchFoodsPage')
             ->once()
-            ->with('poulet', 0, 20, 'FR', 'fr')
+            ->with('poulet', 0, 20, 'FR', 'fr', null)
             ->andReturn([
                 'results' => [],
                 'pagination' => $this->pagination(total: 0),
@@ -88,6 +93,11 @@ class FoodSearchControllerTest extends TestCase
                 'message' => 'Invalid signature: please refer to the documentation',
                 'ip' => null,
             ]);
+        $fatSecret
+            ->shouldReceive('getFoodCategories')
+            ->once()
+            ->with('FR', 'fr')
+            ->andReturn([]);
 
         $this->app->instance(FatSecretService::class, $fatSecret);
 
@@ -144,6 +154,40 @@ class FoodSearchControllerTest extends TestCase
                 ->where('food.food_id', '1641')
                 ->where('meal', 'lunch')
                 ->where('query', 'poulet')
+                ->where('searchError', null));
+    }
+
+    public function test_barcode_renders_food_detail_view(): void
+    {
+        $user = User::factory()->create([
+            'fatsecret_region' => 'FR',
+            'fatsecret_language' => 'fr',
+        ]);
+
+        $fatSecret = Mockery::mock(FatSecretService::class);
+        $fatSecret
+            ->shouldReceive('searchByBarcode')
+            ->once()
+            ->with('3017620422003', 'FR', 'fr')
+            ->andReturn([
+                'food_id' => '99999',
+                'food_name' => 'Nutella',
+                'servings' => ['serving' => []],
+            ]);
+        $fatSecret
+            ->shouldReceive('lastError')
+            ->once()
+            ->andReturn(null);
+
+        $this->app->instance(FatSecretService::class, $fatSecret);
+
+        $this->actingAs($user)
+            ->get('/recherche/code-barre?barcode=3017620422003&meal=breakfast')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('Search/Show')
+                ->where('food.food_id', '99999')
+                ->where('meal', 'breakfast')
                 ->where('searchError', null));
     }
 

@@ -21,6 +21,7 @@
         "vue": "^3.3.13"
     },
     "dependencies": {
+        "@zxing/browser": "^0.2.0",
         "axios": "^1.16.0",
         "lucide-vue-next": "^1.0.0"
     }
