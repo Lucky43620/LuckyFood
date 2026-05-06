@@ -13,6 +13,7 @@ const props = defineProps({
     food: { type: Object, default: null },
     meal: { type: String, default: 'breakfast' },
     query: { type: String, default: '' },
+    from: { type: String, default: null },
     searchError: { type: Object, default: null },
 })
 
@@ -82,6 +83,10 @@ const preferences = computed(() => props.food?.food_attributes?.preferences ?? [
 const attrState = (v) => (v === 1 ? 'Oui' : v === 0 ? 'Non' : '–')
 
 const searchParams = computed(() => ({ q: props.query, meal: props.meal }))
+const backHref = computed(() =>
+    props.from === 'journal' ? route('journal.index') : route('search.index', searchParams.value),
+)
+const backLabel = computed(() => (props.from === 'journal' ? 'Retour au journal' : 'Retour à la recherche'))
 
 const totalCal = computed(() => Math.round(calories.value * Math.max(0.1, quantity.value)))
 
@@ -112,11 +117,11 @@ const addToJournal = () => {
         <div class="max-w-3xl px-5 py-6 md:px-8">
             <!-- Retour -->
             <Link
-                :href="route('search.index', searchParams)"
+                :href="backHref"
                 class="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition-colors hover:text-green-600"
             >
                 <ArrowLeft :size="15" />
-                Retour à la recherche
+                {{ backLabel }}
             </Link>
 
             <!-- Erreur API -->

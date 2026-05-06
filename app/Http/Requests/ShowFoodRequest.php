@@ -20,6 +20,7 @@ class ShowFoodRequest extends FormRequest
         return [
             'q' => ['nullable', 'string', 'max:120'],
             'meal' => ['nullable', Rule::in(['breakfast', 'lunch', 'snack', 'dinner'])],
+            'from' => ['nullable', Rule::in(['journal'])],
         ];
     }
 
@@ -31,5 +32,10 @@ class ShowFoodRequest extends FormRequest
     public function queryText(): string
     {
         return trim((string) $this->input('q', ''));
+    }
+
+    public function from(): ?string
+    {
+        return $this->input('from');
     }
 }

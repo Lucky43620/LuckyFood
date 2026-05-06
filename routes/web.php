@@ -47,6 +47,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
         // ── Progression ─────────────────────────────────────────────────────────
         Route::get('/progression', [ProgressionController::class, 'index'])->name('progression');
+        Route::put('/progression/poids', [ProgressionController::class, 'updateWeight'])->name('progression.update-weight');
 
         // ── Objectifs ───────────────────────────────────────────────────────────
         Route::get('/objectifs', [UserGoalController::class, 'index'])->name('goals.index');

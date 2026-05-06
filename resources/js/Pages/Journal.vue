@@ -123,6 +123,10 @@ const removeEntry = (id) => {
                         :name="entry.food_name"
                         :serving="entry.serving_description"
                         :kcal="entry.calories"
+                        :protein="entry.protein"
+                        :carbs="entry.carbs"
+                        :fat="entry.fat"
+                        :href="route('search.show', { foodId: entry.food_id, from: 'journal', meal: meal.key })"
                         :last="idx === byMeal(meal.key).length - 1"
                         @remove="removeEntry(entry.id)"
                     />
