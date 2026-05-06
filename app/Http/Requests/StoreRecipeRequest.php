@@ -25,6 +25,7 @@ class StoreRecipeRequest extends FormRequest
             'tags.*' => ['string', 'max:100'],
             'instructions' => ['nullable', 'array', 'max:50'],
             'instructions.*' => ['nullable', 'string', 'max:2000'],
+            'image' => ['nullable', 'image', 'max:4096'],
             'total_calories' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'total_protein' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'total_carbs' => ['nullable', 'numeric', 'min:0', 'max:10000'],

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
-import { LayoutDashboard, BookOpen, Search, ChefHat, TrendingUp } from 'lucide-vue-next'
+import { LayoutDashboard, BookOpen, Search, ChefHat, Star } from 'lucide-vue-next'
 
 const page = usePage()
 
@@ -9,8 +9,8 @@ const NAV_ITEMS = [
     { id: 'dashboard', label: 'Accueil', icon: LayoutDashboard, href: () => route('dashboard'), match: 'Dashboard' },
     { id: 'log', label: 'Journal', icon: BookOpen, href: () => route('journal.index'), match: 'Journal' },
     { id: 'search', label: 'Rechercher', icon: Search, href: () => route('search.index'), match: 'Search' },
+    { id: 'favorites', label: 'Favoris', icon: Star, href: () => route('favorites.index'), match: 'Favoris' },
     { id: 'recipes', label: 'Recettes', icon: ChefHat, href: () => route('recipes.index'), match: 'Recettes' },
-    { id: 'progress', label: 'Progression', icon: TrendingUp, href: () => route('progression'), match: 'Progression' },
 ]
 
 const currentComponent = computed(() => page.component)

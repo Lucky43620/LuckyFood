@@ -5,9 +5,34 @@ namespace App\Http\Controllers;
 use App\Models\FavoriteFood;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class FavoriteFoodController extends Controller
 {
+    public function index(Request $request): Response
+    {
+        $favorites = FavoriteFood::where('user_id', $request->user()->id)
+            ->orderBy('food_name')
+            ->get()
+            ->map(fn (FavoriteFood $food): array => [
+                'food_id' => $food->food_id,
+                'food_name' => $food->food_name,
+                'serving_description' => $food->serving_description,
+                'calories' => $food->calories,
+                'protein' => (float) $food->protein,
+                'carbs' => (float) $food->carbs,
+                'fat' => (float) $food->fat,
+                'fiber' => (float) $food->fiber,
+                'is_favorite' => true,
+            ])
+            ->values();
+
+        return Inertia::render('Favoris/Index', [
+            'favorites' => $favorites,
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([

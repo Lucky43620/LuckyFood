@@ -39,6 +39,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
             ->middleware('throttle:fatsecret')
             ->name('search.barcode');
         Route::get('/recherche/aliment/{foodId}', [FoodSearchController::class, 'show'])->name('search.show');
+        Route::get('/favoris', [FavoriteFoodController::class, 'index'])->name('favorites.index');
         Route::post('/favoris/aliments', [FavoriteFoodController::class, 'store'])->name('favorite-foods.store');
         Route::delete('/favoris/aliments/{foodId}', [FavoriteFoodController::class, 'destroy'])->name('favorite-foods.destroy');
 
@@ -48,9 +49,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
             ->name('recipes.ingredients.search');
         Route::resource('recettes', RecipeController::class)
             ->names('recipes')
-            ->parameters(['recettes' => 'recipe'])
-            ->except(['edit', 'update']);
+            ->parameters(['recettes' => 'recipe']);
         Route::post('/recettes/{recipe}/journal', [RecipeController::class, 'addToJournal'])->name('recipes.add-to-journal');
+        Route::post('/recettes/{recipe}/dupliquer', [RecipeController::class, 'duplicate'])->name('recipes.duplicate');
 
         // ── Progression ─────────────────────────────────────────────────────────
         Route::get('/progression', [ProgressionController::class, 'index'])->name('progression');

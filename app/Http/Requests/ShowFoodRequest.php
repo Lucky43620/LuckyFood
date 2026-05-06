@@ -20,7 +20,8 @@ class ShowFoodRequest extends FormRequest
         return [
             'q' => ['nullable', 'string', 'max:120'],
             'meal' => ['nullable', Rule::in(['breakfast', 'lunch', 'snack', 'dinner'])],
-            'from' => ['nullable', Rule::in(['journal'])],
+            'from' => ['nullable', Rule::in(['journal', 'dashboard', 'recipe', 'favorites'])],
+            'recipe_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -37,5 +38,10 @@ class ShowFoodRequest extends FormRequest
     public function from(): ?string
     {
         return $this->input('from');
+    }
+
+    public function recipeId(): ?int
+    {
+        return $this->integer('recipe_id') ?: null;
     }
 }

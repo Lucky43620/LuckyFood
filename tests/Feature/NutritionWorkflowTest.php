@@ -250,6 +250,76 @@ class NutritionWorkflowTest extends TestCase
         $this->assertTrue($recipe->is_public);
     }
 
+    public function test_recipe_can_be_updated_and_duplicated(): void
+    {
+        $user = User::factory()->create();
+        $recipe = Recipe::create([
+            'user_id' => $user->id,
+            'name' => 'Avant',
+            'servings' => 2,
+            'prep_time' => 10,
+            'tags' => [],
+            'instructions' => [],
+            'total_calories' => 100,
+            'total_protein' => 10,
+            'total_carbs' => 10,
+            'total_fat' => 2,
+        ]);
+        $recipe->ingredients()->create([
+            'food_id' => 'rice',
+            'food_name' => 'Riz',
+            'quantity' => 100,
+            'unit' => 'g',
+            'calories' => 130,
+            'protein' => 2.5,
+            'carbs' => 28,
+            'fat' => 0.3,
+        ]);
+
+        $this->actingAs($user)
+            ->put("/recettes/{$recipe->id}", [
+                'name' => 'Apres',
+                'servings' => 1,
+                'prep_time' => 15,
+                'tags' => ['Rapide'],
+                'instructions' => ['Melanger.'],
+                'ingredients' => [
+                    [
+                        'food_id' => 'egg',
+                        'food_name' => 'Oeuf',
+                        'quantity' => 100,
+                        'unit' => 'g',
+                        'calories' => 155,
+                        'protein' => 13,
+                        'carbs' => 1,
+                        'fat' => 11,
+                    ],
+                ],
+            ])
+            ->assertRedirect("/recettes/{$recipe->id}");
+
+        $this->assertDatabaseHas('recipes', [
+            'id' => $recipe->id,
+            'name' => 'Apres',
+            'total_calories' => 155,
+        ]);
+        $this->assertDatabaseMissing('recipe_ingredients', [
+            'recipe_id' => $recipe->id,
+            'food_id' => 'rice',
+        ]);
+
+        $this->actingAs($user)
+            ->post("/recettes/{$recipe->id}/dupliquer")
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('recipes', [
+            'user_id' => $user->id,
+            'name' => 'Apres (copie)',
+            'is_public' => false,
+            'total_calories' => 155,
+        ]);
+    }
+
     public function test_public_recipe_can_be_viewed_and_added_to_journal(): void
     {
         $owner = User::factory()->create();
@@ -314,6 +384,26 @@ class NutritionWorkflowTest extends TestCase
             'user_id' => $user->id,
             'food_id' => '1641',
         ]);
+    }
+
+    public function test_favorites_page_is_available(): void
+    {
+        $user = User::factory()->create();
+        FavoriteFood::create([
+            'user_id' => $user->id,
+            'food_id' => '1641',
+            'food_name' => 'Poulet',
+            'serving_description' => '100 g',
+            'calories' => 165,
+            'protein' => 31,
+            'carbs' => 0,
+            'fat' => 3.6,
+            'fiber' => 0,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/favoris')
+            ->assertOk();
     }
 
     public function test_nutrition_data_can_be_exported_as_json(): void

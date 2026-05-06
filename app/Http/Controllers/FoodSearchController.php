@@ -82,6 +82,7 @@ class FoodSearchController extends Controller
             'meal' => $request->meal(),
             'query' => $request->queryText(),
             'from' => $request->from(),
+            'recipeId' => $request->recipeId(),
             'searchError' => $this->errors->search($food->error()),
         ]);
     }

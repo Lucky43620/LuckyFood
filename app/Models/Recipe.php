@@ -10,9 +10,11 @@ class Recipe extends Model
 {
     protected $fillable = [
         'user_id', 'name', 'servings', 'prep_time', 'category',
-        'tags', 'instructions', 'is_public', 'total_calories', 'total_protein',
+        'tags', 'instructions', 'image_path', 'is_public', 'total_calories', 'total_protein',
         'total_carbs', 'total_fat',
     ];
+
+    protected $appends = ['image_url'];
 
     protected $casts = [
         'tags' => 'array',
@@ -41,5 +43,12 @@ class Recipe extends Model
         return $this->servings > 0
             ? (int) round($this->total_calories / $this->servings)
             : $this->total_calories;
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->image_path
+            ? '/storage/'.ltrim($this->image_path, '/')
+            : null;
     }
 }

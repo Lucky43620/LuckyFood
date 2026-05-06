@@ -15,6 +15,20 @@ const props = defineProps({
 const emit = defineEmits(['add-food', 'remove-food'])
 
 const total = computed(() => props.items.reduce((sum, item) => sum + (item.calories ?? 0), 0))
+
+const itemHref = (item) => {
+    const foodId = String(item.food_id ?? '')
+
+    if (!foodId || foodId.startsWith('manual:')) return null
+
+    if (foodId.startsWith('recipe:')) {
+        const recipeId = foodId.replace('recipe:', '')
+
+        return recipeId ? route('recipes.show', recipeId) : null
+    }
+
+    return route('search.show', { foodId, meal: props.mealType, from: 'dashboard' })
+}
 </script>
 
 <template>
@@ -49,6 +63,10 @@ const total = computed(() => props.items.reduce((sum, item) => sum + (item.calor
             :name="item.food_name ?? item.name"
             :serving="item.serving_description ?? item.serving ?? ''"
             :kcal="item.calories ?? 0"
+            :protein="item.protein"
+            :carbs="item.carbs"
+            :fat="item.fat"
+            :href="itemHref(item)"
             :last="idx === items.length - 1"
             @remove="emit('remove-food', item)"
         />

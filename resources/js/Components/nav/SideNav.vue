@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
-import { Leaf, LayoutDashboard, BookOpen, Search, ChefHat, TrendingUp, Target, Settings } from 'lucide-vue-next'
+import { Leaf, LayoutDashboard, BookOpen, Search, ChefHat, TrendingUp, Target, Settings, Star } from 'lucide-vue-next'
 
 const page = usePage()
 
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
     },
     { id: 'log', label: 'Journal', icon: BookOpen, href: () => route('journal.index'), match: 'Journal' },
     { id: 'search', label: 'Rechercher', icon: Search, href: () => route('search.index'), match: 'Search' },
+    { id: 'favorites', label: 'Favoris', icon: Star, href: () => route('favorites.index'), match: 'Favoris' },
     { id: 'recipes', label: 'Recettes', icon: ChefHat, href: () => route('recipes.index'), match: 'Recettes' },
     { id: 'progress', label: 'Progression', icon: TrendingUp, href: () => route('progression'), match: 'Progression' },
     { id: 'goals', label: 'Objectifs', icon: Target, href: () => route('goals.index'), match: 'Objectifs' },

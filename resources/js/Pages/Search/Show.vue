@@ -14,6 +14,7 @@ const props = defineProps({
     meal: { type: String, default: 'breakfast' },
     query: { type: String, default: '' },
     from: { type: String, default: null },
+    recipeId: { type: Number, default: null },
     searchError: { type: Object, default: null },
 })
 
@@ -83,10 +84,22 @@ const preferences = computed(() => props.food?.food_attributes?.preferences ?? [
 const attrState = (v) => (v === 1 ? 'Oui' : v === 0 ? 'Non' : '–')
 
 const searchParams = computed(() => ({ q: props.query, meal: props.meal }))
-const backHref = computed(() =>
-    props.from === 'journal' ? route('journal.index') : route('search.index', searchParams.value),
-)
-const backLabel = computed(() => (props.from === 'journal' ? 'Retour au journal' : 'Retour à la recherche'))
+const backHref = computed(() => {
+    if (props.from === 'dashboard') return route('dashboard')
+    if (props.from === 'journal') return route('journal.index')
+    if (props.from === 'recipe' && props.recipeId) return route('recipes.show', props.recipeId)
+    if (props.from === 'favorites') return route('favorites.index')
+
+    return route('search.index', searchParams.value)
+})
+const backLabel = computed(() => {
+    if (props.from === 'dashboard') return 'Retour au tableau de bord'
+    if (props.from === 'journal') return 'Retour au journal'
+    if (props.from === 'recipe' && props.recipeId) return 'Retour à la recette'
+    if (props.from === 'favorites') return 'Retour aux favoris'
+
+    return 'Retour à la recherche'
+})
 
 const totalCal = computed(() => Math.round(calories.value * Math.max(0.1, quantity.value)))
 

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
-import { ChevronLeft, ChefHat, Clock, Users, Flame, Trash2 } from 'lucide-vue-next'
+import { Link, router, usePage } from '@inertiajs/vue3'
+import { ChevronLeft, ChefHat, Clock, Users, Flame, Trash2, Copy, Pencil } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import AppBadge from '@/Components/ui/AppBadge.vue'
 import AppButton from '@/Components/ui/AppButton.vue'
@@ -15,6 +15,7 @@ const props = defineProps({
 
 const page = usePage()
 const canDelete = computed(() => props.recipe.user_id === page.props.auth.user?.id)
+const canEdit = computed(() => props.recipe.user_id === page.props.auth.user?.id)
 const journalForm = ref({
     date: new Date().toISOString().split('T')[0],
     meal_type: 'lunch',
@@ -26,12 +27,24 @@ const shoppingList = computed(() =>
         .join('\n'),
 )
 
+const ingredientHref = (ingredient) => {
+    const foodId = String(ingredient.food_id ?? '')
+
+    if (!foodId || foodId.startsWith('manual:') || foodId.startsWith('recipe:')) return null
+
+    return route('search.show', { foodId, q: ingredient.food_name, from: 'recipe', recipe_id: props.recipe.id })
+}
+
 const deleteRecipe = () => {
     if (confirm('Supprimer cette recette ?')) {
         router.delete(route('recipes.destroy', props.recipe.id), {
             onSuccess: () => router.visit(route('recipes.index')),
         })
     }
+}
+
+const duplicateRecipe = () => {
+    router.post(route('recipes.duplicate', props.recipe.id))
 }
 
 const addToJournal = () => {
@@ -58,6 +71,23 @@ const addToJournal = () => {
                     </h1>
                 </div>
                 <button
+                    @click="duplicateRecipe"
+                    class="flex h-9 w-9 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-green-50 hover:text-green-600"
+                    aria-label="Dupliquer la recette"
+                    title="Dupliquer"
+                >
+                    <Copy :size="16" />
+                </button>
+                <button
+                    v-if="canEdit"
+                    @click="router.visit(route('recipes.edit', recipe.id))"
+                    class="flex h-9 w-9 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-50 hover:text-neutral-700"
+                    aria-label="Modifier la recette"
+                    title="Modifier"
+                >
+                    <Pencil :size="16" />
+                </button>
+                <button
                     v-if="canDelete"
                     @click="deleteRecipe"
                     class="flex h-9 w-9 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500"
@@ -69,8 +99,16 @@ const addToJournal = () => {
 
             <!-- Hero card -->
             <div class="overflow-hidden rounded-xl bg-white shadow-md">
-                <div class="flex h-36 items-center justify-center bg-gradient-to-br from-green-100 to-green-50">
-                    <ChefHat :size="40" class="text-green-300" />
+                <div class="h-36 overflow-hidden bg-green-50">
+                    <img
+                        v-if="recipe.image_url"
+                        :src="recipe.image_url"
+                        :alt="recipe.name"
+                        class="h-full w-full object-cover"
+                    />
+                    <div v-else class="flex h-full items-center justify-center">
+                        <ChefHat :size="40" class="text-green-300" />
+                    </div>
                 </div>
                 <div class="p-5">
                     <!-- Tags -->
@@ -166,7 +204,14 @@ const addToJournal = () => {
                         class="flex items-center justify-between px-4 py-3"
                     >
                         <div class="min-w-0 flex-1">
-                            <p class="truncate text-[13px] font-semibold text-neutral-800">{{ ing.food_name }}</p>
+                            <component
+                                :is="ingredientHref(ing) ? Link : 'span'"
+                                :href="ingredientHref(ing) ?? undefined"
+                                class="block truncate text-[13px] font-semibold text-neutral-800"
+                                :class="ingredientHref(ing) && 'transition-colors hover:text-green-600'"
+                            >
+                                {{ ing.food_name }}
+                            </component>
                             <p class="font-mono text-[11px] text-neutral-400">{{ ing.calories ?? 0 }} kcal</p>
                         </div>
                         <span class="ml-3 shrink-0 font-mono text-xs font-semibold text-neutral-500">

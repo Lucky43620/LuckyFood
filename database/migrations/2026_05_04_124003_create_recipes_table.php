@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('category')->nullable();
             $table->json('tags')->nullable();
             $table->json('instructions')->nullable();
+            $table->string('image_path')->nullable();
             $table->boolean('is_public')->default(false);
             $table->unsignedSmallInteger('total_calories')->default(0);
             $table->decimal('total_protein', 6, 2)->default(0);

@@ -16,4 +16,9 @@ class RecipePolicy
     {
         return $recipe->user_id === $user->id;
     }
+
+    public function update(User $user, Recipe $recipe): bool
+    {
+        return $recipe->user_id === $user->id;
+    }
 }

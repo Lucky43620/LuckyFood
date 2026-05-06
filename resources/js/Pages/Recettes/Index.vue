@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
-import { ChefHat, Plus, Clock, Users, Flame } from 'lucide-vue-next'
+import { ChefHat, Plus, Clock, Users, Flame, Copy, Pencil } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import AppButton from '@/Components/ui/AppButton.vue'
 import AppBadge from '@/Components/ui/AppBadge.vue'
@@ -27,11 +27,16 @@ const caloriesPerServing = (r) => (r.servings > 0 ? Math.round(r.total_calories 
 const macroPercent = (kcal, total) => (total > 0 ? Math.round((kcal / total) * 100) : 0)
 const macroEnergyTotal = (r) => (r.total_protein ?? 0) * 4 + (r.total_carbs ?? 0) * 4 + (r.total_fat ?? 0) * 9
 const canDelete = (recipe) => recipe.user_id === userId.value
+const canEdit = (recipe) => recipe.user_id === userId.value
 
 const deleteRecipe = (id) => {
     if (confirm('Supprimer cette recette ?')) {
         router.delete(route('recipes.destroy', id))
     }
+}
+
+const duplicateRecipe = (id) => {
+    router.post(route('recipes.duplicate', id))
 }
 </script>
 
@@ -72,9 +77,17 @@ const deleteRecipe = (id) => {
                     class="group cursor-pointer overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md"
                     @click="router.visit(route('recipes.show', recipe.id))"
                 >
-                    <!-- Color placeholder (thumbnail) -->
-                    <div class="flex h-32 items-center justify-center bg-gradient-to-br from-green-100 to-green-50">
-                        <ChefHat :size="32" class="text-green-300" />
+                    <!-- Thumbnail -->
+                    <div class="h-32 overflow-hidden bg-green-50">
+                        <img
+                            v-if="recipe.image_url"
+                            :src="recipe.image_url"
+                            :alt="recipe.name"
+                            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        />
+                        <div v-else class="flex h-full items-center justify-center">
+                            <ChefHat :size="32" class="text-green-300" />
+                        </div>
                     </div>
 
                     <div class="p-4">
@@ -136,13 +149,32 @@ const deleteRecipe = (id) => {
                                 </span>
                                 <span class="text-xs text-neutral-400">kcal / portion</span>
                             </div>
-                            <button
-                                v-if="canDelete(recipe)"
-                                @click.stop="deleteRecipe(recipe.id)"
-                                class="rounded px-2 py-1 text-xs text-neutral-400 transition-colors hover:text-red-500"
-                            >
-                                Supprimer
-                            </button>
+                            <div class="flex items-center gap-1">
+                                <button
+                                    @click.stop="duplicateRecipe(recipe.id)"
+                                    class="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-green-50 hover:text-green-600"
+                                    aria-label="Dupliquer la recette"
+                                    title="Dupliquer"
+                                >
+                                    <Copy :size="14" />
+                                </button>
+                                <button
+                                    v-if="canEdit(recipe)"
+                                    @click.stop="router.visit(route('recipes.edit', recipe.id))"
+                                    class="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-50 hover:text-neutral-700"
+                                    aria-label="Modifier la recette"
+                                    title="Modifier"
+                                >
+                                    <Pencil :size="14" />
+                                </button>
+                                <button
+                                    v-if="canDelete(recipe)"
+                                    @click.stop="deleteRecipe(recipe.id)"
+                                    class="rounded px-2 py-1 text-xs text-neutral-400 transition-colors hover:text-red-500"
+                                >
+                                    Supprimer
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

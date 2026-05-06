@@ -2,32 +2,63 @@
 import { ref, computed, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import axios from 'axios'
-import { ChevronLeft, ChevronRight, Plus, Minus, X, Search, ChefHat, Loader2 } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Plus, Minus, X, Search, ChefHat, Loader2, Camera } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import AppInput from '@/Components/ui/AppInput.vue'
 import AppButton from '@/Components/ui/AppButton.vue'
 import AppBadge from '@/Components/ui/AppBadge.vue'
 import { AVAILABLE_RECIPE_TAGS } from '@/constants/nutrition'
 
+const props = defineProps({
+    recipe: { type: Object, default: null },
+    isEditing: { type: Boolean, default: false },
+})
+
 const step = ref(1)
 const STEPS = ['Infos', 'Ingrédients', 'Préparation', 'Résumé']
 const canBack = computed(() => step.value > 1)
+const editing = computed(() => props.isEditing && props.recipe?.id)
+const pageTitle = computed(() => (editing.value ? 'Modifier une recette' : 'Creer une recette'))
+const backTarget = computed(() => (editing.value ? route('recipes.show', props.recipe.id) : route('recipes.index')))
+
+const toNumber = (value) => {
+    const number = Number(value)
+    return Number.isFinite(number) ? number : 0
+}
 
 const form = ref({
-    name: '',
-    servings: 2,
-    prepTime: 20,
-    tags: [],
-    isPublic: false,
+    name: props.recipe?.name ?? '',
+    servings: props.recipe?.servings ?? 2,
+    prepTime: props.recipe?.prep_time ?? 20,
+    tags: [...(props.recipe?.tags ?? [])],
+    isPublic: Boolean(props.recipe?.is_public ?? false),
+    image: null,
 })
 
+const imageInput = ref(null)
+const imagePreview = ref(props.recipe?.image_url ?? null)
 const searchQuery = ref('')
 const searchResults = ref([])
 const searchError = ref(null)
 const searching = ref(false)
-const ingredients = ref([])
-const instructions = ref([{ id: 1, text: '' }])
-let nextInstructionId = 2
+const ingredients = ref(
+    (props.recipe?.ingredients ?? []).map((ingredient) => ({
+        food_id: ingredient.food_id,
+        food_name: ingredient.food_name,
+        serving_description: ingredient.serving_description ?? 'Base FatSecret',
+        quantity: toNumber(ingredient.quantity) || 1,
+        unit: ingredient.unit ?? 'g',
+        base_quantity: toNumber(ingredient.quantity) || 1,
+        calories: toNumber(ingredient.calories),
+        protein: toNumber(ingredient.protein),
+        carbs: toNumber(ingredient.carbs),
+        fat: toNumber(ingredient.fat),
+    })),
+)
+const initialInstructions =
+    Array.isArray(props.recipe?.instructions) && props.recipe.instructions.length ? props.recipe.instructions : ['']
+const instructions = ref(initialInstructions.map((text, index) => ({ id: index + 1, text })))
+let nextInstructionId = instructions.value.length + 1
 
 const normalizedInstructions = computed(() =>
     instructions.value.map((instruction) => String(instruction.text ?? '').trim()).filter(Boolean),
@@ -45,9 +76,13 @@ const toggleTag = (tag) => {
     index === -1 ? form.value.tags.push(tag) : form.value.tags.splice(index, 1)
 }
 
-const toNumber = (value) => {
-    const number = Number(value)
-    return Number.isFinite(number) ? number : 0
+const chooseImage = () => imageInput.value?.click()
+
+const onImageChange = (event) => {
+    const file = event.target.files?.[0] ?? null
+
+    form.value.image = file
+    imagePreview.value = file ? window.URL.createObjectURL(file) : (props.recipe?.image_url ?? null)
 }
 
 let searchTimer = null
@@ -170,45 +205,48 @@ const saving = ref(false)
 const save = () => {
     saving.value = true
 
-    router.post(
-        route('recipes.store'),
-        {
-            name: form.value.name,
-            servings: form.value.servings,
-            prep_time: form.value.prepTime,
-            is_public: form.value.isPublic,
-            tags: form.value.tags,
-            instructions: normalizedInstructions.value,
-            total_calories: Math.round(nutrition.value.calories),
-            total_protein: +nutrition.value.protein.toFixed(2),
-            total_carbs: +nutrition.value.carbs.toFixed(2),
-            total_fat: +nutrition.value.fat.toFixed(2),
-            ingredients: ingredients.value.map((ingredient) => ({
-                food_id: ingredient.food_id,
-                food_name: ingredient.food_name,
-                quantity: toNumber(ingredient.quantity),
-                unit: ingredient.unit ?? 'g',
-                calories: ingredientNutrition(ingredient, 'calories'),
-                protein: ingredientNutrition(ingredient, 'protein'),
-                carbs: ingredientNutrition(ingredient, 'carbs'),
-                fat: ingredientNutrition(ingredient, 'fat'),
-            })),
+    const payload = {
+        name: form.value.name,
+        servings: form.value.servings,
+        prep_time: form.value.prepTime,
+        is_public: form.value.isPublic,
+        tags: form.value.tags,
+        instructions: normalizedInstructions.value,
+        total_calories: Math.round(nutrition.value.calories),
+        total_protein: +nutrition.value.protein.toFixed(2),
+        total_carbs: +nutrition.value.carbs.toFixed(2),
+        total_fat: +nutrition.value.fat.toFixed(2),
+        image: form.value.image,
+        ingredients: ingredients.value.map((ingredient) => ({
+            food_id: ingredient.food_id,
+            food_name: ingredient.food_name,
+            quantity: toNumber(ingredient.quantity),
+            unit: ingredient.unit ?? 'g',
+            calories: ingredientNutrition(ingredient, 'calories'),
+            protein: ingredientNutrition(ingredient, 'protein'),
+            carbs: ingredientNutrition(ingredient, 'carbs'),
+            fat: ingredientNutrition(ingredient, 'fat'),
+        })),
+    }
+
+    if (editing.value) {
+        payload._method = 'put'
+    }
+
+    router.post(editing.value ? route('recipes.update', props.recipe.id) : route('recipes.store'), payload, {
+        onFinish: () => {
+            saving.value = false
         },
-        {
-            onFinish: () => {
-                saving.value = false
-            },
-        },
-    )
+    })
 }
 </script>
 
 <template>
-    <MainLayout title="Créer une recette">
+    <MainLayout :title="pageTitle">
         <div class="flex max-w-3xl flex-col gap-5 px-6 py-6 md:px-7">
             <div class="flex items-center gap-3">
                 <button
-                    @click="step > 1 ? step-- : router.visit(route('recipes.index'))"
+                    @click="step > 1 ? step-- : router.visit(backTarget)"
                     class="flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-500 shadow-sm transition-colors hover:text-neutral-800"
                     aria-label="Retour"
                 >
@@ -217,7 +255,7 @@ const save = () => {
                 <div>
                     <p class="mb-0.5 text-xs font-semibold uppercase tracking-widest text-neutral-400">Recette</p>
                     <h1 class="font-display text-[24px] leading-tight tracking-tight text-neutral-900">
-                        Nouvelle recette
+                        {{ editing ? 'Modifier la recette' : 'Nouvelle recette' }}
                     </h1>
                 </div>
             </div>
@@ -242,6 +280,34 @@ const save = () => {
 
             <div v-if="step === 1" class="flex flex-col gap-5">
                 <AppInput v-model="form.name" label="Nom de la recette" placeholder="Ex : Poulet rôti aux herbes" />
+
+                <div class="rounded-lg bg-white p-4 shadow-sm">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-neutral-800">Miniature</p>
+                            <p class="text-xs text-neutral-400">Photo affichee dans la bibliotheque et la fiche</p>
+                        </div>
+                        <button
+                            type="button"
+                            class="flex h-9 items-center gap-1.5 rounded-pill bg-neutral-100 px-3 text-xs font-semibold text-neutral-600 transition-colors hover:bg-green-50 hover:text-green-600"
+                            @click="chooseImage"
+                        >
+                            <Camera :size="14" /> Choisir
+                        </button>
+                    </div>
+                    <input ref="imageInput" type="file" accept="image/*" class="hidden" @change="onImageChange" />
+                    <div class="h-36 overflow-hidden rounded-lg bg-green-50">
+                        <img
+                            v-if="imagePreview"
+                            :src="imagePreview"
+                            :alt="form.name || 'Miniature recette'"
+                            class="h-full w-full object-cover"
+                        />
+                        <div v-else class="flex h-full items-center justify-center">
+                            <ChefHat :size="34" class="text-green-300" />
+                        </div>
+                    </div>
+                </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -474,8 +540,16 @@ const save = () => {
 
             <div v-else class="flex flex-col gap-4">
                 <div class="overflow-hidden rounded-xl bg-white shadow-md">
-                    <div class="flex h-24 items-center justify-center bg-gradient-to-br from-green-100 to-green-50">
-                        <ChefHat :size="28" class="text-green-300" />
+                    <div class="h-24 overflow-hidden bg-green-50">
+                        <img
+                            v-if="imagePreview"
+                            :src="imagePreview"
+                            :alt="form.name"
+                            class="h-full w-full object-cover"
+                        />
+                        <div v-else class="flex h-full items-center justify-center">
+                            <ChefHat :size="28" class="text-green-300" />
+                        </div>
                     </div>
                     <div class="p-5">
                         <h2 class="mb-2 font-display text-xl text-neutral-900">{{ form.name }}</h2>
@@ -543,7 +617,9 @@ const save = () => {
                 <AppButton v-if="step < STEPS.length" :disabled="!canNext" @click="step++">
                     Continuer <ChevronRight :size="16" />
                 </AppButton>
-                <AppButton v-else :loading="saving" @click="save"> Enregistrer la recette </AppButton>
+                <AppButton v-else :loading="saving" @click="save">
+                    {{ editing ? 'Enregistrer les modifications' : 'Enregistrer la recette' }}
+                </AppButton>
             </div>
         </div>
     </MainLayout>

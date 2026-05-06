@@ -1,4 +1,6 @@
 <script setup>
+import { Link } from '@inertiajs/vue3'
+import { LogOut } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue'
 import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue'
@@ -52,6 +54,24 @@ defineProps({
                     Sessions actives
                 </p>
                 <LogoutOtherBrowserSessionsForm :sessions="sessions" />
+            </div>
+
+            <!-- Logout -->
+            <div class="rounded-xl bg-white p-5 shadow-sm">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Session</p>
+                        <p class="mt-1 text-sm text-neutral-500">Quitter votre compte sur cet appareil.</p>
+                    </div>
+                    <Link
+                        :href="route('logout')"
+                        method="post"
+                        as="button"
+                        class="inline-flex h-10 items-center justify-center gap-1.5 rounded-pill bg-neutral-100 px-5 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-800"
+                    >
+                        <LogOut :size="15" /> Se deconnecter
+                    </Link>
+                </div>
             </div>
 
             <!-- Delete account -->
