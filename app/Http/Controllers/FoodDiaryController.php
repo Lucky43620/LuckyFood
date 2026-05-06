@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreFoodDiaryEntryRequest;
 use App\Models\FoodDiaryEntry;
 use App\Models\UserGoal;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -53,6 +54,47 @@ class FoodDiaryController extends Controller
             'user_id' => $request->user()->id,
             'date' => $request->entryDate(),
         ]);
+
+        return back();
+    }
+
+    public function update(StoreFoodDiaryEntryRequest $request, FoodDiaryEntry $entry): RedirectResponse
+    {
+        Gate::authorize('update', $entry);
+
+        $validated = $request->validated();
+
+        $entry->update([
+            ...$validated,
+            'date' => $request->entryDate(),
+        ]);
+
+        return back();
+    }
+
+    public function repeatYesterday(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $targetDate = (string) ($validated['date'] ?? now()->toDateString());
+        $sourceDate = Carbon::createFromFormat('Y-m-d', $targetDate)->subDay()->toDateString();
+        $userId = $request->user()->id;
+
+        FoodDiaryEntry::where('user_id', $userId)
+            ->where('date', $sourceDate)
+            ->orderBy('created_at')
+            ->get()
+            ->each(function (FoodDiaryEntry $entry) use ($targetDate): void {
+                FoodDiaryEntry::create([
+                    ...$entry->only([
+                        'user_id', 'meal_type', 'food_id', 'food_name', 'serving_description',
+                        'quantity', 'calories', 'protein', 'carbs', 'fat', 'fiber',
+                    ]),
+                    'date' => $targetDate,
+                ]);
+            });
 
         return back();
     }

@@ -1,7 +1,7 @@
 <script setup>
-import { ref } from 'vue'
-import { router } from '@inertiajs/vue3'
-import { Target, Flame, Dumbbell, Wheat, Droplets, Scale } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { useForm } from '@inertiajs/vue3'
+import { Target, Flame, Dumbbell, Wheat, Droplets, Scale, CircleGauge, Ruler, User } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import AppInput from '@/Components/ui/AppInput.vue'
 import AppButton from '@/Components/ui/AppButton.vue'
@@ -25,7 +25,7 @@ const props = defineProps({
     },
 })
 
-const form = ref({
+const form = useForm({
     calories_goal: props.goal.calories_goal ?? 2000,
     protein_goal: props.goal.protein_goal ?? 150,
     carbs_goal: props.goal.carbs_goal ?? 250,
@@ -37,24 +37,12 @@ const form = ref({
     activity_level: props.goal.activity_level ?? 'moderate',
     goal_type: props.goal.goal_type ?? 'maintain',
     gender: props.goal.gender ?? null,
+    age: props.goal.age ?? '',
+    height_cm: props.goal.height_cm ?? '',
 })
 
-const saving = ref(false)
-const success = ref(false)
-
 const save = () => {
-    saving.value = true
-    router.put(route('goals.update'), form.value, {
-        onSuccess: () => {
-            success.value = true
-            setTimeout(() => {
-                success.value = false
-            }, 3000)
-        },
-        onFinish: () => {
-            saving.value = false
-        },
-    })
+    form.put(route('goals.update'), { preserveScroll: true })
 }
 
 const ACTIVITY_LEVELS = [
@@ -70,6 +58,53 @@ const GOAL_TYPES = [
     { key: 'maintain', label: 'Maintenir', color: 'green' },
     { key: 'gain', label: 'Prendre du muscle', color: 'amber' },
 ]
+
+const GENDERS = [
+    { key: null, label: 'Non précisé' },
+    { key: 'female', label: 'Femme' },
+    { key: 'male', label: 'Homme' },
+    { key: 'other', label: 'Autre' },
+]
+
+const activityMultiplier = computed(() => {
+    return (
+        {
+            sedentary: 1.2,
+            light: 1.375,
+            moderate: 1.55,
+            active: 1.725,
+            very_active: 1.9,
+        }[form.activity_level] ?? 1.55
+    )
+})
+
+const suggestedCalories = computed(() => {
+    const weight = Number(form.weight_current)
+    const height = Number(form.height_cm)
+    const age = Number(form.age)
+
+    if (!weight || !height || !age) return null
+
+    const offset = form.gender === 'male' ? 5 : form.gender === 'female' ? -161 : -78
+    const bmr = 10 * weight + 6.25 * height - 5 * age + offset
+    const goalDelta = form.goal_type === 'lose' ? -400 : form.goal_type === 'gain' ? 250 : 0
+
+    return Math.max(500, Math.round(bmr * activityMultiplier.value + goalDelta))
+})
+
+const applySuggestion = () => {
+    if (!suggestedCalories.value) return
+
+    const weight = Number(form.weight_current) || 70
+    const protein = Math.round(weight * (form.goal_type === 'gain' ? 2 : 1.8))
+    const fat = Math.round(weight * 0.8)
+    const carbCalories = Math.max(suggestedCalories.value - protein * 4 - fat * 9, 0)
+
+    form.calories_goal = suggestedCalories.value
+    form.protein_goal = protein
+    form.fat_goal = fat
+    form.carbs_goal = Math.round(carbCalories / 4)
+}
 </script>
 
 <template>
@@ -83,13 +118,13 @@ const GOAL_TYPES = [
                     </p>
                     <h1 class="font-display text-[28px] leading-tight tracking-tight text-neutral-900">Objectifs</h1>
                 </div>
-                <AppButton :loading="saving" @click="save"> Enregistrer </AppButton>
+                <AppButton :loading="form.processing" @click="save"> Enregistrer </AppButton>
             </div>
 
             <!-- Success toast -->
             <Transition name="fade">
                 <div
-                    v-if="success"
+                    v-if="form.recentlySuccessful"
                     class="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-medium text-green-700"
                 >
                     <Target :size="16" /> Objectifs enregistrés avec succès
@@ -133,7 +168,10 @@ const GOAL_TYPES = [
                             v-model.number="form.calories_goal"
                             label="Calories / jour"
                             type="number"
+                            min="500"
+                            max="10000"
                             placeholder="2000"
+                            :error="form.errors.calories_goal"
                             class="flex-1"
                         />
                     </div>
@@ -145,7 +183,10 @@ const GOAL_TYPES = [
                             v-model.number="form.protein_goal"
                             label="Protéines (g/j)"
                             type="number"
+                            min="0"
+                            max="500"
                             placeholder="150"
+                            :error="form.errors.protein_goal"
                             class="flex-1"
                         />
                     </div>
@@ -157,7 +198,40 @@ const GOAL_TYPES = [
                             v-model.number="form.carbs_goal"
                             label="Glucides (g/j)"
                             type="number"
+                            min="0"
+                            max="1000"
                             placeholder="250"
+                            :error="form.errors.carbs_goal"
+                            class="flex-1"
+                        />
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-orange-50">
+                            <Flame :size="16" class="text-orange-500" />
+                        </div>
+                        <AppInput
+                            v-model.number="form.fat_goal"
+                            label="Lipides (g/j)"
+                            type="number"
+                            min="0"
+                            max="300"
+                            placeholder="65"
+                            :error="form.errors.fat_goal"
+                            class="flex-1"
+                        />
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-blue-100">
+                            <Wheat :size="16" class="text-blue-500" />
+                        </div>
+                        <AppInput
+                            v-model.number="form.fiber_goal"
+                            label="Fibres (g/j)"
+                            type="number"
+                            min="0"
+                            max="200"
+                            placeholder="30"
+                            :error="form.errors.fiber_goal"
                             class="flex-1"
                         />
                     </div>
@@ -174,24 +248,88 @@ const GOAL_TYPES = [
                         v-model.number="form.weight_current"
                         label="Poids actuel (kg)"
                         type="number"
+                        min="20"
+                        max="500"
+                        step="0.1"
                         placeholder="70"
                         :icon="Scale"
+                        :error="form.errors.weight_current"
                     />
                     <AppInput
                         v-model.number="form.weight_goal"
                         label="Poids cible (kg)"
                         type="number"
+                        min="20"
+                        max="500"
+                        step="0.1"
                         placeholder="65"
                         :icon="Scale"
+                        :error="form.errors.weight_goal"
+                    />
+                    <AppInput
+                        v-model.number="form.age"
+                        label="Âge"
+                        type="number"
+                        min="10"
+                        max="120"
+                        placeholder="30"
+                        :icon="User"
+                        :error="form.errors.age"
+                    />
+                    <AppInput
+                        v-model.number="form.height_cm"
+                        label="Taille (cm)"
+                        type="number"
+                        min="80"
+                        max="250"
+                        placeholder="175"
+                        :icon="Ruler"
+                        :error="form.errors.height_cm"
                     />
                     <AppInput
                         v-model.number="form.water_goal"
                         label="Eau (verres/j)"
                         type="number"
+                        min="0"
+                        max="30"
                         placeholder="8"
                         :icon="Droplets"
+                        :error="form.errors.water_goal"
                     />
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-sm font-semibold text-neutral-700">Genre</label>
+                        <select
+                            v-model="form.gender"
+                            class="focus:ring-green-500/20 h-11 rounded-md border border-neutral-200 bg-white px-3 text-[14px] text-neutral-800 transition-all focus:border-green-400 focus:outline-none focus:ring-2"
+                        >
+                            <option v-for="gender in GENDERS" :key="String(gender.key)" :value="gender.key">
+                                {{ gender.label }}
+                            </option>
+                        </select>
+                        <p v-if="form.errors.gender" class="text-xs text-red-500">{{ form.errors.gender }}</p>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Suggestion -->
+            <div class="rounded-xl bg-white p-5 shadow-sm">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <CircleGauge :size="16" class="text-green-600" />
+                        <p class="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+                            Calcul conseillé
+                        </p>
+                    </div>
+                    <AppButton size="sm" variant="secondary" :disabled="!suggestedCalories" @click="applySuggestion">
+                        Appliquer
+                    </AppButton>
+                </div>
+                <p class="font-mono text-2xl font-semibold text-neutral-900">
+                    {{ suggestedCalories ?? '–' }}<span class="ml-1 text-xs text-neutral-400">kcal/j</span>
+                </p>
+                <p class="mt-1 text-xs text-neutral-400">
+                    Basé sur poids, taille, âge, activité et objectif principal.
+                </p>
             </div>
 
             <!-- Activité -->

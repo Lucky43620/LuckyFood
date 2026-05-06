@@ -7,6 +7,8 @@ use App\Http\Requests\AutocompleteFoodRequest;
 use App\Http\Requests\BarcodeFoodRequest;
 use App\Http\Requests\SearchFoodRequest;
 use App\Http\Requests\ShowFoodRequest;
+use App\Models\FavoriteFood;
+use App\Models\FoodDiaryEntry;
 use App\Services\FatSecretService;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
@@ -39,6 +41,19 @@ class FoodSearchController extends Controller
         }
 
         $categories = $this->fatSecret->getFoodCategoriesResult($region, $language);
+        $favorites = FavoriteFood::where('user_id', $request->user()->id)
+            ->orderBy('food_name')
+            ->get()
+            ->map(fn (FavoriteFood $food): array => $this->favoritePayload($food))
+            ->values();
+        $recentFoods = FoodDiaryEntry::where('user_id', $request->user()->id)
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->unique('food_id')
+            ->take(8)
+            ->map(fn (FoodDiaryEntry $entry): array => $this->diaryPayload($entry))
+            ->values();
 
         return Inertia::render('Search', [
             'query' => $query,
@@ -48,6 +63,9 @@ class FoodSearchController extends Controller
             'searchError' => $searchError,
             'categories' => $categories->data(),
             'categoryId' => $categoryId,
+            'favorites' => $favorites,
+            'recentFoods' => $recentFoods,
+            'favoriteFoodIds' => $favorites->pluck('food_id')->all(),
         ]);
     }
 
@@ -116,6 +134,35 @@ class FoodSearchController extends Controller
             'to' => 0,
             'has_previous' => false,
             'has_next' => false,
+        ];
+    }
+
+    private function favoritePayload(FavoriteFood $food): array
+    {
+        return [
+            'food_id' => $food->food_id,
+            'food_name' => $food->food_name,
+            'serving_description' => $food->serving_description,
+            'calories' => $food->calories,
+            'protein' => (float) $food->protein,
+            'carbs' => (float) $food->carbs,
+            'fat' => (float) $food->fat,
+            'fiber' => (float) $food->fiber,
+            'is_favorite' => true,
+        ];
+    }
+
+    private function diaryPayload(FoodDiaryEntry $entry): array
+    {
+        return [
+            'food_id' => $entry->food_id,
+            'food_name' => $entry->food_name,
+            'serving_description' => $entry->serving_description,
+            'calories' => $entry->calories,
+            'protein' => (float) $entry->protein,
+            'carbs' => (float) $entry->carbs,
+            'fat' => (float) $entry->fat,
+            'fiber' => (float) $entry->fiber,
         ];
     }
 }

@@ -1,6 +1,11 @@
 <script setup>
-defineProps({
+import { computed, useAttrs } from 'vue'
+
+defineOptions({ inheritAttrs: false })
+
+const props = defineProps({
     modelValue: { type: [String, Number], default: '' },
+    modelModifiers: { type: Object, default: () => ({}) },
     label: { type: String, default: null },
     placeholder: { type: String, default: '' },
     error: { type: String, default: null },
@@ -10,11 +15,23 @@ defineProps({
     disabled: { type: Boolean, default: false },
 })
 
-defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue'])
+const attrs = useAttrs()
+
+const inputAttrs = computed(() => {
+    const rest = { ...attrs }
+    delete rest.class
+
+    return rest
+})
+
+const updateValue = (value) => {
+    emit('update:modelValue', props.modelModifiers.number && value !== '' ? Number(value) : value)
+}
 </script>
 
 <template>
-    <div class="flex flex-col gap-1.5">
+    <div class="flex flex-col gap-1.5" :class="$attrs.class">
         <label v-if="label" class="text-sm font-semibold text-neutral-700">{{ label }}</label>
 
         <div class="relative">
@@ -28,7 +45,8 @@ defineEmits(['update:modelValue'])
                 :value="modelValue"
                 :placeholder="placeholder"
                 :disabled="disabled"
-                @input="$emit('update:modelValue', $event.target.value)"
+                v-bind="inputAttrs"
+                @input="updateValue($event.target.value)"
                 class="h-11 w-full rounded-md border bg-white text-[14px] text-neutral-800 placeholder-neutral-400 transition-all duration-150 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                 :class="[
                     icon ? 'pl-9' : 'pl-4',

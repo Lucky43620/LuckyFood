@@ -1,5 +1,5 @@
 <script setup>
-import { onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { X, ScanLine, Camera, AlertCircle } from 'lucide-vue-next'
@@ -57,7 +57,7 @@ function close() {
     emit('close')
 }
 
-startScanner()
+onMounted(startScanner)
 onUnmounted(stopScanner)
 </script>
 

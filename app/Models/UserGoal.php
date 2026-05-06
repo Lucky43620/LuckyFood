@@ -11,6 +11,7 @@ class UserGoal extends Model
         'user_id', 'calories_goal', 'protein_goal', 'carbs_goal',
         'fat_goal', 'fiber_goal', 'water_goal', 'weight_current',
         'weight_goal', 'activity_level', 'goal_type', 'gender',
+        'age', 'height_cm',
     ];
 
     protected $casts = [
@@ -22,6 +23,8 @@ class UserGoal extends Model
         'water_goal' => 'integer',
         'weight_current' => 'decimal:1',
         'weight_goal' => 'decimal:1',
+        'age' => 'integer',
+        'height_cm' => 'integer',
     ];
 
     public function user(): BelongsTo

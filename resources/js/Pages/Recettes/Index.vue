@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { ChefHat, Plus, Clock, Users, Flame } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import AppButton from '@/Components/ui/AppButton.vue'
@@ -11,17 +11,22 @@ const props = defineProps({
     recipes: { type: Array, default: () => [] },
 })
 
+const page = usePage()
+const userId = computed(() => page.props.auth.user?.id)
 const activeFilter = ref('Tous')
-const FILTERS = ['Tous', 'Haut en protéines', 'Végétarien', 'Végan', 'Rapide']
+const FILTERS = ['Tous', 'Public', 'Haut en protéines', 'Végétarien', 'Végan', 'Rapide']
 
 const filtered = computed(() => {
     if (activeFilter.value === 'Tous') return props.recipes
+    if (activeFilter.value === 'Public') return props.recipes.filter((r) => r.is_public)
     return props.recipes.filter((r) => (r.tags ?? []).includes(activeFilter.value) || r.category === activeFilter.value)
 })
 
 const caloriesPerServing = (r) => (r.servings > 0 ? Math.round(r.total_calories / r.servings) : r.total_calories)
 
 const macroPercent = (kcal, total) => (total > 0 ? Math.round((kcal / total) * 100) : 0)
+const macroEnergyTotal = (r) => (r.total_protein ?? 0) * 4 + (r.total_carbs ?? 0) * 4 + (r.total_fat ?? 0) * 9
+const canDelete = (recipe) => recipe.user_id === userId.value
 
 const deleteRecipe = (id) => {
     if (confirm('Supprimer cette recette ?')) {
@@ -82,6 +87,7 @@ const deleteRecipe = (id) => {
                             >
                                 {{ tag }}
                             </AppBadge>
+                            <AppBadge v-if="recipe.is_public" color="blue">Public</AppBadge>
                         </div>
 
                         <h3
@@ -89,6 +95,9 @@ const deleteRecipe = (id) => {
                         >
                             {{ recipe.name }}
                         </h3>
+                        <p v-if="recipe.user && recipe.user_id !== userId" class="mb-2 text-[11px] text-neutral-400">
+                            Par {{ recipe.user.name }}
+                        </p>
 
                         <!-- Meta: time + servings -->
                         <div class="mb-3 flex items-center gap-3 text-xs text-neutral-400">
@@ -112,7 +121,7 @@ const deleteRecipe = (id) => {
                                 class="h-1.5 rounded-full transition-all"
                                 :class="m.color"
                                 :style="{
-                                    width: `${macroPercent(m.val, recipe.total_calories * 4 || 1)}%`,
+                                    width: `${macroPercent(m.val, macroEnergyTotal(recipe) || 1)}%`,
                                     minWidth: '4px',
                                 }"
                             />
@@ -128,6 +137,7 @@ const deleteRecipe = (id) => {
                                 <span class="text-xs text-neutral-400">kcal / portion</span>
                             </div>
                             <button
+                                v-if="canDelete(recipe)"
                                 @click.stop="deleteRecipe(recipe.id)"
                                 class="rounded px-2 py-1 text-xs text-neutral-400 transition-colors hover:text-red-500"
                             >

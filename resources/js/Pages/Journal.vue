@@ -1,12 +1,12 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { router } from '@inertiajs/vue3'
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import MacroBar from '@/Components/nutrition/MacroBar.vue'
 import FoodItem from '@/Components/food/FoodItem.vue'
 import AppButton from '@/Components/ui/AppButton.vue'
-import { MEAL_CONFIGS } from '@/constants/nutrition'
+import { MEAL_CONFIGS, MEALS } from '@/constants/nutrition'
 
 const props = defineProps({
     date: { type: String, required: true },
@@ -33,9 +33,53 @@ const navigate = (offset) => {
 }
 
 const byMeal = (key) => props.entries.filter((e) => e.meal_type === key)
+const entryHref = (entry, mealKey) => {
+    const id = String(entry.food_id ?? '')
+
+    if (id.startsWith('manual:') || id.startsWith('recipe:')) return null
+
+    return route('search.show', { foodId: entry.food_id, from: 'journal', meal: mealKey })
+}
+const editingEntry = ref(null)
+const editForm = ref({})
+
+const openEdit = (entry) => {
+    editingEntry.value = entry
+    editForm.value = {
+        date: entry.date,
+        food_id: entry.food_id,
+        food_name: entry.food_name,
+        meal_type: entry.meal_type,
+        serving_description: entry.serving_description ?? '',
+        quantity: Number(entry.quantity ?? 1),
+        calories: Number(entry.calories ?? 0),
+        protein: Number(entry.protein ?? 0),
+        carbs: Number(entry.carbs ?? 0),
+        fat: Number(entry.fat ?? 0),
+        fiber: Number(entry.fiber ?? 0),
+    }
+}
+
+const closeEdit = () => {
+    editingEntry.value = null
+    editForm.value = {}
+}
+
+const submitEdit = () => {
+    if (!editingEntry.value) return
+
+    router.put(route('journal.update', editingEntry.value.id), editForm.value, {
+        preserveScroll: true,
+        onSuccess: closeEdit,
+    })
+}
 
 const removeEntry = (id) => {
     router.delete(route('journal.destroy', id), { preserveScroll: true })
+}
+
+const repeatYesterday = () => {
+    router.post(route('journal.repeat-yesterday'), { date: props.date }, { preserveScroll: true })
 }
 </script>
 
@@ -43,7 +87,7 @@ const removeEntry = (id) => {
     <MainLayout title="Journal alimentaire">
         <div class="flex flex-col gap-5 px-6 py-6 md:px-7">
             <!-- Header with date navigation -->
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p class="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400">Journal</p>
                     <h1 class="font-display text-[28px] capitalize leading-tight tracking-tight text-neutral-900">
@@ -52,6 +96,10 @@ const removeEntry = (id) => {
                 </div>
 
                 <div class="flex items-center gap-2">
+                    <AppButton size="sm" variant="secondary" @click="repeatYesterday">
+                        <RotateCcw :size="14" />
+                        Hier
+                    </AppButton>
                     <button
                         @click="navigate(-1)"
                         class="flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-500 shadow-sm transition-colors hover:text-neutral-800"
@@ -126,13 +174,114 @@ const removeEntry = (id) => {
                         :protein="entry.protein"
                         :carbs="entry.carbs"
                         :fat="entry.fat"
-                        :href="route('search.show', { foodId: entry.food_id, from: 'journal', meal: meal.key })"
+                        :href="entryHref(entry, meal.key)"
+                        can-edit
                         :last="idx === byMeal(meal.key).length - 1"
+                        @edit="openEdit(entry)"
                         @remove="removeEntry(entry.id)"
                     />
                 </div>
                 <p v-else class="px-4 py-3 text-xs italic text-neutral-400">Aucun aliment ajouté</p>
             </div>
         </div>
+
+        <Transition name="fade">
+            <div
+                v-if="editingEntry"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/50 p-4"
+                @click.self="closeEdit"
+            >
+                <form class="w-full max-w-xl rounded-xl bg-white p-5 shadow-lg" @submit.prevent="submitEdit">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-widest text-neutral-400">
+                                Modifier l'entrée
+                            </p>
+                            <h2 class="mt-1 text-lg font-bold text-neutral-900">{{ editForm.food_name }}</h2>
+                        </div>
+                        <button
+                            type="button"
+                            class="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                            @click="closeEdit"
+                        >
+                            <X :size="16" />
+                        </button>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700">
+                            Nom
+                            <input
+                                v-model="editForm.food_name"
+                                class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal text-neutral-800 focus:border-green-400 focus:outline-none"
+                            />
+                        </label>
+                        <label class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700">
+                            Date
+                            <input
+                                v-model="editForm.date"
+                                type="date"
+                                class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal text-neutral-800 focus:border-green-400 focus:outline-none"
+                            />
+                        </label>
+                        <label class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700">
+                            Repas
+                            <select
+                                v-model="editForm.meal_type"
+                                class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal text-neutral-800 focus:border-green-400 focus:outline-none"
+                            >
+                                <option v-for="meal in MEALS" :key="meal.key" :value="meal.key">
+                                    {{ meal.label }}
+                                </option>
+                            </select>
+                        </label>
+                        <label class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700">
+                            Portion
+                            <input
+                                v-model="editForm.serving_description"
+                                class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal text-neutral-800 focus:border-green-400 focus:outline-none"
+                            />
+                        </label>
+                        <label
+                            v-for="field in [
+                                { key: 'quantity', label: 'Quantité', step: '0.1' },
+                                { key: 'calories', label: 'Calories', step: '1' },
+                                { key: 'protein', label: 'Protéines', step: '0.1' },
+                                { key: 'carbs', label: 'Glucides', step: '0.1' },
+                                { key: 'fat', label: 'Lipides', step: '0.1' },
+                                { key: 'fiber', label: 'Fibres', step: '0.1' },
+                            ]"
+                            :key="field.key"
+                            class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700"
+                        >
+                            {{ field.label }}
+                            <input
+                                v-model.number="editForm[field.key]"
+                                type="number"
+                                min="0"
+                                :step="field.step"
+                                class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal text-neutral-800 focus:border-green-400 focus:outline-none"
+                            />
+                        </label>
+                    </div>
+
+                    <div class="mt-5 flex justify-end gap-2">
+                        <AppButton type="button" variant="ghost" @click="closeEdit">Annuler</AppButton>
+                        <AppButton type="submit">Enregistrer</AppButton>
+                    </div>
+                </form>
+            </div>
+        </Transition>
     </MainLayout>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+</style>

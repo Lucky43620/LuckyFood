@@ -1,6 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3'
-import { ArrowUpRight, Leaf, Loader2, Plus } from 'lucide-vue-next'
+import { ArrowUpRight, Leaf, Loader2, Plus, Star } from 'lucide-vue-next'
 import AppBadge from '@/Components/ui/AppBadge.vue'
 import { useFormatting } from '@/composables/useFormatting'
 
@@ -8,9 +8,10 @@ defineProps({
     food: { type: Object, required: true },
     detailParams: { type: Object, required: true },
     adding: { type: Boolean, default: false },
+    favorite: { type: Boolean, default: false },
 })
 
-defineEmits(['add'])
+defineEmits(['add', 'favorite'])
 
 const { number } = useFormatting()
 </script>
@@ -92,6 +93,16 @@ const { number } = useFormatting()
                 >
                     <Loader2 v-if="adding" :size="14" class="animate-spin" />
                     <Plus v-else :size="16" />
+                </button>
+                <button
+                    type="button"
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-white transition-colors hover:border-amber-300 hover:text-amber-500"
+                    :class="favorite ? 'border-amber-300 text-amber-500' : 'text-neutral-400'"
+                    :aria-label="favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+                    :title="favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+                    @click="$emit('favorite', food)"
+                >
+                    <Star :size="15" :fill="favorite ? 'currentColor' : 'none'" />
                 </button>
             </div>
         </div>

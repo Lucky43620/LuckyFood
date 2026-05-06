@@ -1,8 +1,11 @@
 <script setup>
-import { router } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
+import { router, usePage } from '@inertiajs/vue3'
 import { ChevronLeft, ChefHat, Clock, Users, Flame, Trash2 } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 import AppBadge from '@/Components/ui/AppBadge.vue'
+import AppButton from '@/Components/ui/AppButton.vue'
+import { MEALS } from '@/constants/nutrition'
 import { RECIPE_CATEGORY_COLORS } from '@/constants/nutrition'
 
 const props = defineProps({
@@ -10,12 +13,29 @@ const props = defineProps({
     perServing: { type: Object, default: () => ({ calories: 0, protein: 0, carbs: 0, fat: 0 }) },
 })
 
+const page = usePage()
+const canDelete = computed(() => props.recipe.user_id === page.props.auth.user?.id)
+const journalForm = ref({
+    date: new Date().toISOString().split('T')[0],
+    meal_type: 'lunch',
+    servings: 1,
+})
+const shoppingList = computed(() =>
+    (props.recipe.ingredients ?? [])
+        .map((ingredient) => `${ingredient.quantity}${ingredient.unit ?? 'g'} ${ingredient.food_name}`)
+        .join('\n'),
+)
+
 const deleteRecipe = () => {
     if (confirm('Supprimer cette recette ?')) {
         router.delete(route('recipes.destroy', props.recipe.id), {
             onSuccess: () => router.visit(route('recipes.index')),
         })
     }
+}
+
+const addToJournal = () => {
+    router.post(route('recipes.add-to-journal', props.recipe.id), journalForm.value, { preserveScroll: true })
 }
 </script>
 
@@ -38,6 +58,7 @@ const deleteRecipe = () => {
                     </h1>
                 </div>
                 <button
+                    v-if="canDelete"
                     @click="deleteRecipe"
                     class="flex h-9 w-9 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500"
                     aria-label="Supprimer la recette"
@@ -61,6 +82,7 @@ const deleteRecipe = () => {
                         >
                             {{ tag }}
                         </AppBadge>
+                        <AppBadge v-if="recipe.is_public" color="blue">Public</AppBadge>
                     </div>
 
                     <!-- Meta -->
@@ -93,6 +115,43 @@ const deleteRecipe = () => {
                 </div>
             </div>
 
+            <!-- Add to journal -->
+            <div class="rounded-xl bg-white p-5 shadow-sm">
+                <p class="mb-4 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+                    Ajouter au journal
+                </p>
+                <div class="grid gap-3 sm:grid-cols-[1fr_1fr_96px_auto] sm:items-end">
+                    <label class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700">
+                        Date
+                        <input
+                            v-model="journalForm.date"
+                            type="date"
+                            class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal focus:border-green-400 focus:outline-none"
+                        />
+                    </label>
+                    <label class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700">
+                        Repas
+                        <select
+                            v-model="journalForm.meal_type"
+                            class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal focus:border-green-400 focus:outline-none"
+                        >
+                            <option v-for="meal in MEALS" :key="meal.key" :value="meal.key">{{ meal.label }}</option>
+                        </select>
+                    </label>
+                    <label class="flex flex-col gap-1.5 text-sm font-semibold text-neutral-700">
+                        Portions
+                        <input
+                            v-model.number="journalForm.servings"
+                            type="number"
+                            min="0.1"
+                            step="0.1"
+                            class="h-10 rounded-md border border-neutral-200 px-3 text-sm font-normal focus:border-green-400 focus:outline-none"
+                        />
+                    </label>
+                    <AppButton @click="addToJournal">Ajouter</AppButton>
+                </div>
+            </div>
+
             <!-- Ingredients -->
             <div class="overflow-hidden rounded-lg bg-white shadow-sm">
                 <div class="border-b border-neutral-100 px-4 py-3">
@@ -115,6 +174,19 @@ const deleteRecipe = () => {
                         </span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Shopping list -->
+            <div v-if="shoppingList" class="overflow-hidden rounded-lg bg-white shadow-sm">
+                <div class="border-b border-neutral-100 px-4 py-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Liste de courses</p>
+                </div>
+                <textarea
+                    :value="shoppingList"
+                    readonly
+                    rows="5"
+                    class="w-full resize-none border-0 bg-white px-4 py-3 font-mono text-xs text-neutral-600 focus:ring-0"
+                />
             </div>
 
             <!-- Instructions -->

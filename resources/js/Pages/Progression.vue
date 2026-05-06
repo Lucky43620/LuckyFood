@@ -1,16 +1,28 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useForm } from '@inertiajs/vue3'
-import { Check, Flame, Pencil, Scale, Target, TrendingDown } from 'lucide-vue-next'
+import { Check, Droplets, Flame, Pencil, Scale, Target, TrendingDown } from 'lucide-vue-next'
 import MainLayout from '@/Layouts/MainLayout.vue'
 
 const props = defineProps({
     weeklyData: { type: Array, default: () => [] },
     monthlyData: { type: Array, default: () => [] },
     mealBreakdown: { type: Object, default: () => ({}) },
+    waterData: { type: Array, default: () => [] },
     stats: {
         type: Object,
-        default: () => ({ avgCalories: 0, currentWeight: null, totalLoss: null, goalCalories: 2000, streak: 0 }),
+        default: () => ({
+            avgCalories: 0,
+            avgProtein: 0,
+            avgWater: 0,
+            daysLogged: 0,
+            calorieGap: 0,
+            currentWeight: null,
+            totalLoss: null,
+            goalCalories: 2000,
+            goalWater: 8,
+            streak: 0,
+        }),
     },
 })
 
@@ -55,7 +67,7 @@ const chartData = computed(() => {
 
 const values = computed(() => {
     if (viewMode.value === 'month') {
-        return chartData.value.map((d) => (chartMode.value === 'calories' ? (d.avgCalories ?? 0) : 0))
+        return chartData.value.map((d) => (chartMode.value === 'calories' ? (d.avgCalories ?? 0) : (d.avgWeight ?? 0)))
     }
     return chartData.value.map((d) =>
         d.isFuture ? 0 : chartMode.value === 'calories' ? (d.calories ?? 0) : (d.weight ?? 0),
@@ -150,6 +162,30 @@ const STAT_CARDS = computed(() => [
         bg: 'bg-amber-100',
     },
     {
+        icon: Check,
+        label: 'Jours loggés',
+        val: props.stats.daysLogged || '–',
+        unit: 'cette semaine',
+        color: 'text-green-600',
+        bg: 'bg-green-50',
+    },
+    {
+        icon: Droplets,
+        label: 'Eau moyenne',
+        val: props.stats.avgWater || '–',
+        unit: 'verres/j',
+        color: 'text-blue-500',
+        bg: 'bg-blue-100',
+    },
+    {
+        icon: Flame,
+        label: 'Écart objectif',
+        val: props.stats.calorieGap > 0 ? `+${props.stats.calorieGap}` : props.stats.calorieGap || '–',
+        unit: 'kcal/j',
+        color: props.stats.calorieGap > 0 ? 'text-orange-500' : 'text-green-600',
+        bg: props.stats.calorieGap > 0 ? 'bg-orange-50' : 'bg-green-50',
+    },
+    {
         icon: TrendingDown,
         label: 'Écart poids',
         val: props.stats.totalLoss ?? '–',
@@ -158,6 +194,30 @@ const STAT_CARDS = computed(() => [
         bg: 'bg-green-50',
     },
 ])
+
+const detailWidth = (item) => {
+    if (chartMode.value === 'weight') {
+        const value = viewMode.value === 'month' ? (item.avgWeight ?? 0) : (item.weight ?? 0)
+
+        return maxVal.value > 0 ? Math.min((value / maxVal.value) * 100, 100) : 0
+    }
+
+    const value = viewMode.value === 'month' ? (item.avgCalories ?? 0) : (item.calories ?? 0)
+
+    return Math.min((value / (props.stats.goalCalories || 2000)) * 100, 100)
+}
+
+const detailLabel = (item) => {
+    if (chartMode.value === 'weight') {
+        const value = viewMode.value === 'month' ? item.avgWeight : item.weight
+
+        return value ? `${value} kg` : '–'
+    }
+
+    const value = viewMode.value === 'month' ? item.avgCalories : item.calories
+
+    return value > 0 ? `${value} ${viewMode.value === 'month' ? 'kcal/j' : 'kcal'}` : '–'
+}
 </script>
 
 <template>
@@ -169,14 +229,28 @@ const STAT_CARDS = computed(() => [
                     <p class="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400">Suivi</p>
                     <h1 class="font-display text-[28px] leading-tight tracking-tight text-neutral-900">Progression</h1>
                 </div>
-                <div
-                    v-if="stats.streak > 0"
-                    class="flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 shadow-sm"
-                >
-                    <Flame :size="14" class="text-orange-500" />
-                    <span class="text-sm font-bold text-orange-600">
-                        {{ stats.streak }} jour{{ stats.streak > 1 ? 's' : '' }}
-                    </span>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <a
+                        :href="route('nutrition.export.csv')"
+                        class="rounded-pill bg-white px-3 py-1.5 text-xs font-semibold text-neutral-500 shadow-sm transition-colors hover:text-green-600"
+                    >
+                        CSV
+                    </a>
+                    <a
+                        :href="route('nutrition.export.json')"
+                        class="rounded-pill bg-white px-3 py-1.5 text-xs font-semibold text-neutral-500 shadow-sm transition-colors hover:text-green-600"
+                    >
+                        JSON
+                    </a>
+                    <div
+                        v-if="stats.streak > 0"
+                        class="flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 shadow-sm"
+                    >
+                        <Flame :size="14" class="text-orange-500" />
+                        <span class="text-sm font-bold text-orange-600">
+                            {{ stats.streak }} jour{{ stats.streak > 1 ? 's' : '' }}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -403,9 +477,7 @@ const STAT_CARDS = computed(() => [
                                 class="h-full rounded-full transition-all duration-500"
                                 :class="day.isFuture ? '' : 'bg-green-500'"
                                 :style="{
-                                    width: day.isFuture
-                                        ? '0%'
-                                        : `${Math.min((day.calories / (stats.goalCalories || 2000)) * 100, 100)}%`,
+                                    width: day.isFuture ? '0%' : `${detailWidth(day)}%`,
                                 }"
                             />
                         </div>
@@ -413,7 +485,7 @@ const STAT_CARDS = computed(() => [
                             class="w-16 shrink-0 text-right font-mono text-xs"
                             :class="day.isFuture ? 'text-neutral-300' : 'text-neutral-600'"
                         >
-                            {{ day.isFuture ? '–' : `${day.calories} kcal` }}
+                            {{ day.isFuture ? '–' : detailLabel(day) }}
                         </span>
                     </div>
                 </div>
@@ -439,12 +511,12 @@ const STAT_CARDS = computed(() => [
                             <div
                                 class="h-full rounded-full bg-green-500 transition-all duration-500"
                                 :style="{
-                                    width: `${Math.min((week.avgCalories / (stats.goalCalories || 2000)) * 100, 100)}%`,
+                                    width: `${detailWidth(week)}%`,
                                 }"
                             />
                         </div>
                         <span class="w-20 shrink-0 text-right font-mono text-xs text-neutral-600">
-                            {{ week.avgCalories > 0 ? `${week.avgCalories} kcal/j` : '–' }}
+                            {{ detailLabel(week) }}
                         </span>
                     </div>
                 </div>
@@ -452,6 +524,48 @@ const STAT_CARDS = computed(() => [
                 <p v-else class="px-4 py-6 text-center text-sm text-neutral-400">
                     Commencez à logger vos repas pour voir votre progression ici.
                 </p>
+            </div>
+
+            <!-- Hydratation -->
+            <div class="rounded-xl bg-white p-5 shadow-md">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+                        Hydratation — cette semaine
+                    </p>
+                    <span class="font-mono text-xs font-semibold text-blue-500">
+                        {{ stats.avgWater || '–' }}/{{ stats.goalWater || 8 }} verres/j
+                    </span>
+                </div>
+                <div class="divide-y divide-neutral-50">
+                    <div
+                        v-for="day in waterData"
+                        :key="day.date"
+                        class="flex items-center gap-4 py-2.5"
+                        :class="day.isToday && 'bg-blue-50/40 px-2'"
+                    >
+                        <span
+                            class="w-10 shrink-0 text-xs font-semibold"
+                            :class="
+                                day.isToday ? 'text-blue-500' : day.isFuture ? 'text-neutral-300' : 'text-neutral-500'
+                            "
+                        >
+                            {{ day.day }}
+                        </span>
+                        <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-blue-100">
+                            <div
+                                class="h-full rounded-full bg-blue-500"
+                                :style="{
+                                    width: day.isFuture
+                                        ? '0%'
+                                        : `${Math.min((day.glasses / (stats.goalWater || 8)) * 100, 100)}%`,
+                                }"
+                            />
+                        </div>
+                        <span class="w-16 shrink-0 text-right font-mono text-xs text-neutral-500">
+                            {{ day.isFuture ? '–' : `${day.glasses} v.` }}
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <!-- Répartition par repas -->

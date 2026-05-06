@@ -18,6 +18,7 @@ const form = ref({
     servings: 2,
     prepTime: 20,
     tags: [],
+    isPublic: false,
 })
 
 const searchQuery = ref('')
@@ -94,8 +95,9 @@ const addIngredient = (food) => {
         food_id: food.food_id,
         food_name: food.food_name,
         serving_description: food.serving_description,
-        quantity: 100,
-        unit: 'g',
+        quantity: toNumber(food.base_quantity) || 100,
+        unit: food.unit ?? 'g',
+        base_quantity: toNumber(food.base_quantity) || 100,
         calories: toNumber(food.calories),
         protein: toNumber(food.protein),
         carbs: toNumber(food.carbs),
@@ -110,8 +112,10 @@ const removeIngredient = (id) => {
     ingredients.value = ingredients.value.filter((ingredient) => ingredient.food_id !== id)
 }
 
-const adjustQty = (ingredient, delta) => {
-    ingredient.quantity = Math.max(1, toNumber(ingredient.quantity) + delta)
+const quantityStep = (ingredient) => (ingredient.unit === 'portion' ? 1 : 10)
+
+const adjustQty = (ingredient, direction) => {
+    ingredient.quantity = Math.max(1, toNumber(ingredient.quantity) + quantityStep(ingredient) * direction)
 }
 
 const setQty = (ingredient, value) => {
@@ -132,14 +136,15 @@ const removeInstruction = (id) => {
 }
 
 const ingredientNutrition = (ingredient, key) => {
-    const value = (toNumber(ingredient[key]) * toNumber(ingredient.quantity)) / 100
+    const value =
+        (toNumber(ingredient[key]) * toNumber(ingredient.quantity)) / Math.max(toNumber(ingredient.base_quantity), 1)
     return key === 'calories' ? Math.round(value) : +value.toFixed(1)
 }
 
 const nutrition = computed(() => {
     return ingredients.value.reduce(
         (acc, ingredient) => {
-            const ratio = toNumber(ingredient.quantity) / 100
+            const ratio = toNumber(ingredient.quantity) / Math.max(toNumber(ingredient.base_quantity), 1)
             acc.calories += toNumber(ingredient.calories) * ratio
             acc.protein += toNumber(ingredient.protein) * ratio
             acc.carbs += toNumber(ingredient.carbs) * ratio
@@ -171,6 +176,7 @@ const save = () => {
             name: form.value.name,
             servings: form.value.servings,
             prep_time: form.value.prepTime,
+            is_public: form.value.isPublic,
             tags: form.value.tags,
             instructions: normalizedInstructions.value,
             total_calories: Math.round(nutrition.value.calories),
@@ -299,6 +305,18 @@ const save = () => {
                         </button>
                     </div>
                 </div>
+
+                <label class="flex items-center justify-between gap-4 rounded-lg bg-white p-4 shadow-sm">
+                    <span>
+                        <span class="block text-sm font-semibold text-neutral-800">Recette publique</span>
+                        <span class="text-xs text-neutral-400">Visible dans la bibliothèque des autres comptes</span>
+                    </span>
+                    <input
+                        v-model="form.isPublic"
+                        type="checkbox"
+                        class="rounded border-neutral-300 text-green-500 focus:ring-green-500"
+                    />
+                </label>
             </div>
 
             <div v-else-if="step === 2" class="flex flex-col gap-4">
@@ -373,7 +391,7 @@ const save = () => {
 
                         <div class="flex shrink-0 items-center justify-between gap-2">
                             <button
-                                @click="adjustQty(ingredient, -10)"
+                                @click="adjustQty(ingredient, -1)"
                                 class="flex h-8 w-8 items-center justify-center text-neutral-300 hover:text-neutral-600"
                                 :aria-label="`Réduire ${ingredient.food_name}`"
                             >
@@ -386,9 +404,9 @@ const save = () => {
                                 @input="setQty(ingredient, $event.target.value)"
                                 class="focus:ring-green-500/20 h-8 w-20 rounded-md border border-neutral-200 bg-white text-center font-mono text-xs font-semibold text-neutral-700 focus:border-green-400"
                             />
-                            <span class="font-mono text-xs font-semibold text-neutral-500">g</span>
+                            <span class="font-mono text-xs font-semibold text-neutral-500">{{ ingredient.unit }}</span>
                             <button
-                                @click="adjustQty(ingredient, 10)"
+                                @click="adjustQty(ingredient, 1)"
                                 class="flex h-8 w-8 items-center justify-center text-neutral-300 hover:text-neutral-600"
                                 :aria-label="`Augmenter ${ingredient.food_name}`"
                             >
@@ -496,7 +514,9 @@ const save = () => {
                         class="flex items-center justify-between px-4 py-2.5"
                     >
                         <span class="text-[13px] text-neutral-700">{{ ingredient.food_name }}</span>
-                        <span class="font-mono text-xs text-neutral-400">{{ ingredient.quantity }}g</span>
+                        <span class="font-mono text-xs text-neutral-400"
+                            >{{ ingredient.quantity }}{{ ingredient.unit }}</span
+                        >
                     </div>
                 </div>
 

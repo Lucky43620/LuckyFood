@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateUserGoalRequest;
 use App\Models\UserGoal;
+use App\Models\WeightEntry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,6 +25,8 @@ class UserGoalController extends Controller
                 'water_goal' => 8,
                 'activity_level' => 'moderate',
                 'goal_type' => 'maintain',
+                'age' => null,
+                'height_cm' => null,
             ]
         );
 
@@ -40,6 +43,13 @@ class UserGoalController extends Controller
             ['user_id' => $request->user()->id],
             $validated
         );
+
+        if (($validated['weight_current'] ?? null) !== null) {
+            WeightEntry::updateOrCreate(
+                ['user_id' => $request->user()->id, 'date' => now()->toDateString()],
+                ['weight' => $validated['weight_current']]
+            );
+        }
 
         return back();
     }

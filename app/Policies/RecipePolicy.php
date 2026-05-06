@@ -9,7 +9,7 @@ class RecipePolicy
 {
     public function view(User $user, Recipe $recipe): bool
     {
-        return $recipe->user_id === $user->id;
+        return $recipe->user_id === $user->id || $recipe->is_public;
     }
 
     public function delete(User $user, Recipe $recipe): bool

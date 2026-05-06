@@ -29,6 +29,8 @@ class UpdateUserGoalRequest extends FormRequest
             'activity_level' => ['required', Rule::in(['sedentary', 'light', 'moderate', 'active', 'very_active'])],
             'goal_type' => ['required', Rule::in(['lose', 'maintain', 'gain'])],
             'gender' => ['nullable', Rule::in(['male', 'female', 'other'])],
+            'age' => ['nullable', 'integer', 'min:10', 'max:120'],
+            'height_cm' => ['nullable', 'integer', 'min:80', 'max:250'],
         ];
     }
 }
